@@ -12,6 +12,8 @@ using var configurationLifetime = configuration as IDisposable;
 var services = new ServiceCollection();
 services.Configure<BridgeControllerDeviceOptions>(
     configuration.GetRequiredSection(BridgeControllerDeviceOptions.SectionName));
+services.Configure<CameraToControlOptions>(
+    configuration.GetRequiredSection(CameraToControlOptions.SectionName));
 services.AddSingleton<CameraBridgeManager>();
 
 using var serviceProvider = services.BuildServiceProvider();

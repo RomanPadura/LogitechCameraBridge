@@ -8,4 +8,6 @@ public sealed class BridgeControllerDeviceOptions
     public string Pid { get; set; } = string.Empty;
     public string UsagePage { get; set; } = string.Empty;
     public string Usage { get; set; } = string.Empty;
+    public string ZoomInCode { get; set; } = string.Empty;
+    public string ZoomOutCode { get; set; } = string.Empty;
 }
