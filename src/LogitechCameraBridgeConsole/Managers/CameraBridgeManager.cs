@@ -1,18 +1,35 @@
 using System.Runtime.InteropServices;
+using System.Globalization;
+using LogitechCameraBridgeConsole.Options;
+using Microsoft.Extensions.Options;
 using DirectShowLib;
 using HidSharp;
 
 namespace LogitechCameraBridgeConsole.Managers;
 
-public class CameraBridgeManager
+public class CameraBridgeManager(IOptions<BridgeControllerDeviceOptions> deviceOptions)
 {
-    public static void InitializeDevices()
+    private readonly BridgeControllerDeviceOptions _deviceOptions = deviceOptions.Value;
+
+    public void InitializeDevices()
     {
-        // Find Logitech GROUP HID collection COL01.
+        int vid = ReadHexDeviceId(_deviceOptions.Vid, nameof(BridgeControllerDeviceOptions.Vid));
+        int pid = ReadHexDeviceId(_deviceOptions.Pid, nameof(BridgeControllerDeviceOptions.Pid));
+        uint usagePage = (uint)ReadHexDeviceId(
+            _deviceOptions.UsagePage, nameof(BridgeControllerDeviceOptions.UsagePage));
+        uint usage = (uint)ReadHexDeviceId(
+            _deviceOptions.Usage, nameof(BridgeControllerDeviceOptions.Usage));
+        uint fullUsage = (usagePage << 16) | usage;
+
+        // Find the Logitech GROUP camera control HID collection by usage.
         var speakerphone = DeviceList.Local
-            .GetHidDevices(0x046D, 0x0857)
-            .First(d => d.DevicePath.Contains(
-                "&col01", StringComparison.OrdinalIgnoreCase));
+            .GetHidDevices(vid, pid)
+            .FirstOrDefault(hidDevice => hidDevice
+                .GetReportDescriptor()
+                .DeviceItems
+                .Any(item => item.Usages.ContainsValue(fullUsage)))
+            ?? throw new InvalidOperationException(
+                "Logitech GROUP camera control device not found.");
 
         // Find Logitech C930e camera.
         var device = DsDevice
@@ -92,5 +109,21 @@ public class CameraBridgeManager
         {
             Marshal.ReleaseComObject(filter);
         }
+    }
+
+    private static int ReadHexDeviceId(string? value, string name)
+    {
+        var hex = value.AsSpan().Trim();
+        if (hex.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            hex = hex[2..];
+
+        if (!ushort.TryParse(hex, NumberStyles.AllowHexSpecifier,
+                CultureInfo.InvariantCulture, out ushort id))
+        {
+            throw new InvalidDataException(
+                $"BridgeControllerDevice.{name} must be a hexadecimal USB ID, such as 0x046D.");
+        }
+
+        return id;
     }
 }
