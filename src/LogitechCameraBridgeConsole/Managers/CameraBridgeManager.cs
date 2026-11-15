@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
+using LogitechCameraBridgeConsole.Interop;
 using LogitechCameraBridgeConsole.Options;
 using Microsoft.Extensions.Options;
 using DirectShowLib;
@@ -121,16 +123,28 @@ public class CameraBridgeManager(
         int pid,
         uint fullUsage)
     {
-        return DeviceList.Local
-            .GetHidDevices(vid, pid)
-            .FirstOrDefault(device => device
-                .GetReportDescriptor()
-                .DeviceItems
-                .Any(item => item.Usages.ContainsValue(fullUsage)))
-            ?? throw new InvalidOperationException(
-                $"HID controller not found. " +
-                $"VID=0x{vid:X4}, PID=0x{pid:X4}, " +
-                $"Usage=0x{fullUsage:X8}.");
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("HID collection discovery requires Windows.");
+
+        foreach (var device in DeviceList.Local.GetHidDevices(vid, pid))
+        {
+            try
+            {
+                uint deviceUsage = WindowsHidCapabilities.GetFullUsage(device.DevicePath);
+                Console.WriteLine($"HID candidate: Usage=0x{deviceUsage:X8}, Path={device.DevicePath}");
+                if (deviceUsage == fullUsage)
+                    return device;
+            }
+            catch (Exception ex) when (ex is Win32Exception or IOException)
+            {
+                Console.Error.WriteLine($"Cannot inspect HID collection '{device.DevicePath}': {ex.Message}");
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"HID controller not found. " +
+            $"VID=0x{vid:X4}, PID=0x{pid:X4}, " +
+            $"Usage=0x{fullUsage:X8}. See any capability query errors above.");
     }
 
     private object CreateCameraFilter(
