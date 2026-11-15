@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../LogitechCameraBridgeSln"
+		},
+		{
+			"name": "LogitechCameraBridge",
+			"path": "../LogitechCameraBridgeSln/LogitechCameraBridge"
+		}
+	],
+	"settings": {}
+}
