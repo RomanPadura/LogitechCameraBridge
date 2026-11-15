@@ -74,6 +74,7 @@ public class CameraBridgeManager(
         cancellationToken.ThrowIfCancellationRequested();
 
         // Find the HID controller.
+        Console.WriteLine("Detecting Bridge HID controller:");
         var speakerphone = FindController(vid, pid, fullUsage);
 
         Console.WriteLine("HID controller found.");
@@ -85,6 +86,7 @@ public class CameraBridgeManager(
         Console.WriteLine();
 
         // Find and initialize the camera filter.
+        Console.WriteLine("Detecting camera to control:");
         var filter = CreateCameraFilter(
             cameraVid,
             cameraPid,

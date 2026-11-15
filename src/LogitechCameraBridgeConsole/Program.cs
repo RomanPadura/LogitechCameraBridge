@@ -3,6 +3,8 @@ using LogitechCameraBridgeConsole.Options;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+Console.WriteLine("Starting app...");
+
 var configuration = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("appSettings.json", optional: false, reloadOnChange: false)
@@ -15,6 +17,8 @@ services.Configure<BridgeControllerDeviceOptions>(
 services.Configure<CameraToControlOptions>(
     configuration.GetRequiredSection(CameraToControlOptions.SectionName));
 services.AddSingleton<CameraBridgeManager>();
+Console.WriteLine("Services are build successfully...");
+Console.WriteLine();
 
 using var cancellationTokenSource = new CancellationTokenSource();
 Console.CancelKeyPress += OnCancelKeyPress;
@@ -40,6 +44,8 @@ finally
 {
     Console.CancelKeyPress -= OnCancelKeyPress;
 }
+
+Console.ReadLine();
 
 void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
 {
