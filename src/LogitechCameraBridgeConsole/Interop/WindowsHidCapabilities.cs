@@ -12,6 +12,9 @@ internal static class WindowsHidCapabilities
 
     public static uint GetFullUsage(string devicePath)
     {
+        Console.WriteLine(
+            $"HIDP_CAPS structure size: {Marshal.SizeOf<HidpCaps>()} bytes.");
+
         // Query metadata without requesting read/write access to the collection.
         using var handle = CreateFileW(devicePath, 0, FileShare.ReadWrite,
             IntPtr.Zero, FileMode.Open, 0, IntPtr.Zero);
