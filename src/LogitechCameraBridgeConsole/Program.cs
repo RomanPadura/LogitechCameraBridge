@@ -16,5 +16,33 @@ services.Configure<CameraToControlOptions>(
     configuration.GetRequiredSection(CameraToControlOptions.SectionName));
 services.AddSingleton<CameraBridgeManager>();
 
+using var cancellationTokenSource = new CancellationTokenSource();
+Console.CancelKeyPress += OnCancelKeyPress;
+
 using var serviceProvider = services.BuildServiceProvider();
-serviceProvider.GetRequiredService<CameraBridgeManager>().InitializeDevices();
+
+try
+{
+    var cameraManager = serviceProvider.GetRequiredService<CameraBridgeManager>();
+    cameraManager.Run(cancellationTokenSource.Token);
+}
+catch (OperationCanceledException)
+    when (cancellationTokenSource.IsCancellationRequested)
+{
+    Console.WriteLine("Operation cancelled.");
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine(ex);
+    Environment.ExitCode = 1;
+}
+finally
+{
+    Console.CancelKeyPress -= OnCancelKeyPress;
+}
+
+void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
+{
+    e.Cancel = true;
+    cancellationTokenSource.Cancel();
+}
