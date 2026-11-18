@@ -1,4 +1,4 @@
-namespace LogitechCameraBridgeConsole.Options;
+namespace LogitechCameraBridge.Common.Options;
 
 public class CameraToControlOptions
 {
@@ -9,6 +9,8 @@ public class CameraToControlOptions
     public string Pid { get; set; } = string.Empty;
 
     public string UsbInterface { get; set; } = string.Empty;
+
+    public string UsbInterfacePrefix { get; set; } = string.Empty;
 
     public string Device { get; set; } = string.Empty;
 }

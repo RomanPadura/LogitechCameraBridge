@@ -2,17 +2,18 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Microsoft.Win32.SafeHandles;
+using LogitechCameraBridge.Logger.Interfaces;
 
-namespace LogitechCameraBridgeConsole.Interop;
+namespace LogitechCameraBridge.Controllers.Interop;
 
 [SupportedOSPlatform("windows")]
 internal static class WindowsHidCapabilities
 {
     private const int HidpStatusSuccess = 0x00110000;
 
-    public static uint GetFullUsage(string devicePath)
+    public static uint GetFullUsage(string devicePath, ICameraBridgeLogger logger)
     {
-        Console.WriteLine(
+        logger.LogInfo(
             $"HIDP_CAPS structure size: {Marshal.SizeOf<HidpCaps>()} bytes.");
 
         // Query metadata without requesting read/write access to the collection.

@@ -10,4 +10,8 @@
     <PackageReference Include="DirectShowLib.Standard" Version="2.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\LogitechCameraBridge.Logger\LogitechCameraBridge.Logger.csproj" />
+  </ItemGroup>
+
 </Project>

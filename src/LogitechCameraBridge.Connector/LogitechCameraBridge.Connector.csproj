@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LogitechCameraBridge.Common\LogitechCameraBridge.Common.csproj" />
+    <ProjectReference Include="..\LogitechCameraBridge.Controllers\LogitechCameraBridge.Controllers.csproj" />
+    <ProjectReference Include="..\LogitechCameraBridge.Cameras\LogitechCameraBridge.Cameras.csproj" />
+    <ProjectReference Include="..\LogitechCameraBridge.Logger\LogitechCameraBridge.Logger.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DirectShowLib.Standard" Version="2.1.0" />
+    <PackageReference Include="HidSharp" Version="2.6.4" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="LogitechCameraBridge.Connector.Tests" />
+  </ItemGroup>
+
+</Project>
