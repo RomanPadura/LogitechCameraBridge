@@ -9,8 +9,6 @@ using LogitechCameraBridge.Logger.Interfaces;
 using LogitechCameraBridge.Controllers.Interfaces;
 using LogitechCameraBridge.Cameras.Interfaces;
 
-Console.WriteLine("Starting app...");
-
 var configuration = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("appSettings.json", optional: false, reloadOnChange: false)
@@ -18,6 +16,8 @@ var configuration = new ConfigurationBuilder()
 using var configurationLifetime = configuration as IDisposable;
 
 var services = new ServiceCollection();
+services.Configure<LoggerOptions>(
+    configuration.GetRequiredSection(LoggerOptions.SectionName));
 services.Configure<BridgeControllerDeviceOptions>(
     configuration.GetRequiredSection(BridgeControllerDeviceOptions.SectionName));
 services.Configure<CameraToControlOptions>(
@@ -26,13 +26,15 @@ services.AddSingleton<ICameraBridgeLogger, ConsoleLogger>();
 services.AddSingleton<IControllerDiscovery, ControllerDiscovery>();
 services.AddSingleton<ICameraDiscovery, CameraDiscovery>();
 services.AddSingleton<CameraBridgeManager>();
-Console.WriteLine("Services are build successfully...");
-Console.WriteLine();
 
 using var cancellationTokenSource = new CancellationTokenSource();
 Console.CancelKeyPress += OnCancelKeyPress;
 
 using var serviceProvider = services.BuildServiceProvider();
+var logger = serviceProvider.GetRequiredService<ICameraBridgeLogger>();
+logger.LogInfo("Starting app...");
+logger.LogInfo("Services are built successfully...");
+logger.LogInfo(string.Empty);
 
 try
 {
@@ -42,11 +44,11 @@ try
 catch (OperationCanceledException)
     when (cancellationTokenSource.IsCancellationRequested)
 {
-    Console.WriteLine("Operation cancelled.");
+    logger.LogInfo("Operation cancelled.");
 }
 catch (Exception ex)
 {
-    Console.Error.WriteLine(ex);
+    logger.LogError(ex.ToString());
     Environment.ExitCode = 1;
 }
 finally

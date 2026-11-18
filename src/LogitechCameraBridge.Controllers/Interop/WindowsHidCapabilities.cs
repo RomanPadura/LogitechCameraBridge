@@ -11,10 +11,10 @@ internal static class WindowsHidCapabilities
 {
     private const int HidpStatusSuccess = 0x00110000;
 
-    public static uint GetFullUsage(string devicePath, ICameraBridgeLogger logger, bool LogToConsole = false)
+    public static uint GetFullUsage(string devicePath, ICameraBridgeLogger logger)
     {
         logger.LogInfo(
-            $"HIDP_CAPS structure size: {Marshal.SizeOf<HidpCaps>()} bytes.", LogToConsole);
+            $"HIDP_CAPS structure size: {Marshal.SizeOf<HidpCaps>()} bytes.");
 
         // Query metadata without requesting read/write access to the collection.
         using var handle = CreateFileW(devicePath, 0, FileShare.ReadWrite,

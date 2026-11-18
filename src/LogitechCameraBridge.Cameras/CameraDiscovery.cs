@@ -11,12 +11,12 @@ public class CameraDiscovery(ICameraBridgeLogger logger) : ICameraDiscovery
     private readonly ICameraBridgeLogger _logger = logger;
 
     /// <inheritdoc />
-    public object CreateCameraFilter(int vid, int pid, string usbInterface, bool LogToConsole = false)
+    public object CreateCameraFilter(int vid, int pid, string usbInterface)
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("DirectShow camera discovery requires Windows.");
 
-        _logger.LogInfo("Detecting camera to control:", LogToConsole);
+        _logger.LogInfo("Detecting camera to control:");
         var devices = DsDevice.GetDevicesOfCat(FilterCategory.VideoInputDevice);
 
         try
@@ -25,13 +25,13 @@ public class CameraDiscovery(ICameraBridgeLogger logger) : ICameraDiscovery
                 ?? throw new InvalidOperationException(
                     $"Camera not found. VID=0x{vid:X4}, PID=0x{pid:X4}, Interface={usbInterface}.");
 
-            _logger.LogInfo("Camera found.", LogToConsole);
-            _logger.LogInfo($"Name:      {device.Name}", LogToConsole);
-            _logger.LogInfo($"VID:       0x{vid:X4}", LogToConsole);
-            _logger.LogInfo($"PID:       0x{pid:X4}", LogToConsole);
-            _logger.LogInfo($"Interface: {usbInterface}", LogToConsole);
-            _logger.LogInfo($"Path:      {device.DevicePath}", LogToConsole);
-            _logger.LogInfo(string.Empty, LogToConsole);
+            _logger.LogInfo("Camera found.");
+            _logger.LogInfo($"Name:      {device.Name}");
+            _logger.LogInfo($"VID:       0x{vid:X4}");
+            _logger.LogInfo($"PID:       0x{pid:X4}");
+            _logger.LogInfo($"Interface: {usbInterface}");
+            _logger.LogInfo($"Path:      {device.DevicePath}");
+            _logger.LogInfo(string.Empty);
 
             var iid = typeof(IBaseFilter).GUID;
             Marshal.ThrowExceptionForHR(CreateBindCtx(0, out var bindContext));

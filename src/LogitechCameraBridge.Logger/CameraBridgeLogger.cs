@@ -1,20 +1,24 @@
 using LogitechCameraBridge.Logger.Interfaces;
+using LogitechCameraBridge.Common.Options;
+using Microsoft.Extensions.Options;
 
 namespace LogitechCameraBridge.Logger;
 
-public class ConsoleLogger : ICameraBridgeLogger
+public class ConsoleLogger(IOptions<LoggerOptions> options) : ICameraBridgeLogger
 {
-    public void LogInfo(string message, bool LogToConsole = false)
+    private readonly LoggerOptions _options = options.Value;
+
+    public void LogInfo(string message)
     {
-        if (!LogToConsole)
+        if (!_options.LogToConsole)
             return;
 
         Console.WriteLine(message);
     }
 
-    public void LogError(string message, bool LogToConsole = false)
+    public void LogError(string message)
     {
-        if (!LogToConsole)
+        if (!_options.LogToConsole)
             return;
 
         Console.Error.WriteLine(message);

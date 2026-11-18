@@ -6,6 +6,7 @@ using DirectShowLib;
 using HidSharp;
 using LogitechCameraBridge.Controllers.Interfaces;
 using LogitechCameraBridge.Cameras.Interfaces;
+using LogitechCameraBridge.Logger.Interfaces;
 
 namespace LogitechCameraBridgeConsole.Managers;
 
@@ -13,8 +14,11 @@ public class CameraBridgeManager(
     IOptions<BridgeControllerDeviceOptions> deviceOptions,
     IOptions<CameraToControlOptions> cameraOptions,
     IControllerDiscovery controllerDiscovery,
-    ICameraDiscovery cameraDiscovery)
+    ICameraDiscovery cameraDiscovery,
+    ICameraBridgeLogger logger)
 {
+    private readonly ICameraBridgeLogger _logger = logger;
+
     private readonly IControllerDiscovery _controllerDiscovery = controllerDiscovery;
     private readonly ICameraDiscovery _cameraDiscovery = cameraDiscovery;
 
@@ -85,14 +89,13 @@ public class CameraBridgeManager(
 
         // Find the HID controller.
         var speakerphone = _controllerDiscovery.FindController(
-            vid, pid, fullUsage, LogToConsole: true);
+            vid, pid, fullUsage);
 
         // Find and initialize the camera filter.
         var filter = _cameraDiscovery.CreateCameraFilter(
             cameraVid,
             cameraPid,
-            usbInterface,
-            LogToConsole: true);
+            usbInterface);
 
         try
         {
@@ -115,10 +118,10 @@ public class CameraBridgeManager(
             Marshal.ReleaseComObject(filter);
         }
 
-        Console.WriteLine("Camera bridge stopped.");
+        _logger.LogInfo("Camera bridge stopped.");
     }
 
-    private static void ProcessReports(
+    private void ProcessReports(
         HidDevice speakerphone,
         IAMCameraControl camera,
         int reportId,
@@ -156,26 +159,26 @@ public class CameraBridgeManager(
             out int currentZoom,
             out _));
 
-        Console.WriteLine("Camera zoom capabilities:");
-        Console.WriteLine($"Min:          {min}");
-        Console.WriteLine($"Max:          {max}");
-        Console.WriteLine($"Step:         {step}");
-        Console.WriteLine($"Default:      {defaultValue}");
-        Console.WriteLine($"Current:      {currentZoom}");
-        Console.WriteLine($"Capabilities: {capabilities}");
-        Console.WriteLine();
+        _logger.LogInfo("Camera zoom capabilities:");
+        _logger.LogInfo($"Min:          {min}");
+        _logger.LogInfo($"Max:          {max}");
+        _logger.LogInfo($"Step:         {step}");
+        _logger.LogInfo($"Default:      {defaultValue}");
+        _logger.LogInfo($"Current:      {currentZoom}");
+        _logger.LogInfo($"Capabilities: {capabilities}");
+        _logger.LogInfo(string.Empty);
 
         // Open the controller HID stream.
         using var stream = speakerphone.Open();
 
         stream.ReadTimeout = 1000;
 
-        Console.WriteLine("Listening for controller buttons...");
-        Console.WriteLine($"Report ID: 0x{reportId:X2}");
-        Console.WriteLine($"Zoom In:   0x{zoomInCode:X2}");
-        Console.WriteLine($"Zoom Out:  0x{zoomOutCode:X2}");
-        Console.WriteLine("Press Ctrl+C to stop.");
-        Console.WriteLine();
+        _logger.LogInfo("Listening for controller buttons...");
+        _logger.LogInfo($"Report ID: 0x{reportId:X2}");
+        _logger.LogInfo($"Zoom In:   0x{zoomInCode:X2}");
+        _logger.LogInfo($"Zoom Out:  0x{zoomOutCode:X2}");
+        _logger.LogInfo("Press Ctrl+C to stop.");
+        _logger.LogInfo(string.Empty);
 
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -197,7 +200,7 @@ public class CameraBridgeManager(
             if (report.Length < 2 || report[0] != reportId)
                 continue;
 
-            Console.WriteLine(
+            _logger.LogInfo(
                 $"HID Report: {Convert.ToHexString(report)}");
 
             byte buttonCode = report[1];
@@ -230,7 +233,7 @@ public class CameraBridgeManager(
             // Avoid unnecessary camera commands.
             if (next == current)
             {
-                Console.WriteLine(
+                _logger.LogInfo(
                     $"Zoom limit reached: {current}");
 
                 continue;
@@ -241,7 +244,7 @@ public class CameraBridgeManager(
                 next,
                 CameraControlFlags.Manual));
 
-            Console.WriteLine($"Zoom: {current} -> {next}");
+            _logger.LogInfo($"Zoom: {current} -> {next}");
         }
     }
 
