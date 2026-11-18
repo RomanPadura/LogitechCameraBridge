@@ -1,4 +1,5 @@
-using LogitechCameraBridgeConsole.Managers;
+using LogitechCameraBridge.Connector.Managers;
+using LogitechCameraBridge.Connector.Interfaces;
 using LogitechCameraBridge.Common.Options;
 using LogitechCameraBridge.Controllers;
 using LogitechCameraBridge.Cameras;
@@ -25,7 +26,7 @@ services.Configure<CameraToControlOptions>(
 services.AddSingleton<ICameraBridgeLogger, ConsoleLogger>();
 services.AddSingleton<IControllerDiscovery, ControllerDiscovery>();
 services.AddSingleton<ICameraDiscovery, CameraDiscovery>();
-services.AddSingleton<CameraBridgeManager>();
+services.AddSingleton<ICameraBridgeManager, CameraBridgeManager>();
 
 using var cancellationTokenSource = new CancellationTokenSource();
 Console.CancelKeyPress += OnCancelKeyPress;
@@ -38,7 +39,7 @@ logger.LogInfo(string.Empty);
 
 try
 {
-    var cameraManager = serviceProvider.GetRequiredService<CameraBridgeManager>();
+    var cameraManager = serviceProvider.GetRequiredService<ICameraBridgeManager>();
     cameraManager.Run(cancellationTokenSource.Token);
 }
 catch (OperationCanceledException)

@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogitechCameraBridge.Logger
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogitechCameraBridge.Common", "src\LogitechCameraBridge.Common\LogitechCameraBridge.Common.csproj", "{32821A14-DF12-444B-8C77-3869A12FB64A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogitechCameraBridge.Connector", "src\LogitechCameraBridge.Connector\LogitechCameraBridge.Connector.csproj", "{A195802A-024B-4931-86FF-DAD6148256DD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -85,6 +87,18 @@ Global
 		{32821A14-DF12-444B-8C77-3869A12FB64A}.Release|x64.Build.0 = Release|Any CPU
 		{32821A14-DF12-444B-8C77-3869A12FB64A}.Release|x86.ActiveCfg = Release|Any CPU
 		{32821A14-DF12-444B-8C77-3869A12FB64A}.Release|x86.Build.0 = Release|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Debug|x64.Build.0 = Debug|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Debug|x86.Build.0 = Debug|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Release|x64.ActiveCfg = Release|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Release|x64.Build.0 = Release|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Release|x86.ActiveCfg = Release|Any CPU
+		{A195802A-024B-4931-86FF-DAD6148256DD}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -95,5 +109,6 @@ Global
 		{738D7783-60A0-48B5-BD75-9A27008C719A} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{141E4C59-442F-4A63-BE10-4792B1841740} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{32821A14-DF12-444B-8C77-3869A12FB64A} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{A195802A-024B-4931-86FF-DAD6148256DD} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

@@ -7,15 +7,16 @@ using HidSharp;
 using LogitechCameraBridge.Controllers.Interfaces;
 using LogitechCameraBridge.Cameras.Interfaces;
 using LogitechCameraBridge.Logger.Interfaces;
+using LogitechCameraBridge.Connector.Interfaces;
 
-namespace LogitechCameraBridgeConsole.Managers;
+namespace LogitechCameraBridge.Connector.Managers;
 
 public class CameraBridgeManager(
     IOptions<BridgeControllerDeviceOptions> deviceOptions,
     IOptions<CameraToControlOptions> cameraOptions,
     IControllerDiscovery controllerDiscovery,
     ICameraDiscovery cameraDiscovery,
-    ICameraBridgeLogger logger)
+    ICameraBridgeLogger logger) : ICameraBridgeManager
 {
     private readonly ICameraBridgeLogger _logger = logger;
 

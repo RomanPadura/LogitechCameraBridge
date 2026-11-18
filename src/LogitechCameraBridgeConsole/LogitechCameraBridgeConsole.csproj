@@ -8,8 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DirectShowLib.Standard" Version="2.1.0" />
-    <PackageReference Include="HidSharp" Version="2.6.4" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
@@ -27,6 +25,7 @@
     <ProjectReference Include="..\LogitechCameraBridge.Cameras\LogitechCameraBridge.Cameras.csproj" />
     <ProjectReference Include="..\LogitechCameraBridge.Common\LogitechCameraBridge.Common.csproj" />
     <ProjectReference Include="..\LogitechCameraBridge.Logger\LogitechCameraBridge.Logger.csproj" />
+    <ProjectReference Include="..\LogitechCameraBridge.Connector\LogitechCameraBridge.Connector.csproj" />
   </ItemGroup>
 
 </Project>
