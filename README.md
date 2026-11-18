@@ -57,7 +57,7 @@ dotnet test LogitechCameraBridgeSln.sln
 
 The tests use a simulated `IAMCameraControl`; they do not verify the physical hardware.
 GitHub Actions builds the solution in Release mode and runs the unit tests on a Windows runner
-with .NET 10 for every push and pull request. You can also start **Build and test** manually
+with .NET 10 for pushes to `main` and for every pull request. You can also start **Build and test** manually
 from the repository's **Actions** tab. Each test run uploads TRX results as the `test-results` artifact.
 See [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) for implementation details and test status.
 
