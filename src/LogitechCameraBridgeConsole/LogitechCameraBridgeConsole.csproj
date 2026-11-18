@@ -22,4 +22,9 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\LogitechCameraBridge.Controllers\LogitechCameraBridge.Controllers.csproj" />
+    <ProjectReference Include="..\LogitechCameraBridge.Cameras\LogitechCameraBridge.Cameras.csproj" />
+  </ItemGroup>
+
 </Project>
