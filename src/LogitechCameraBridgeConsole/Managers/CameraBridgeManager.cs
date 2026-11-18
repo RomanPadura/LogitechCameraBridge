@@ -26,6 +26,9 @@ public class CameraBridgeManager(
 
     public void Run(CancellationToken cancellationToken = default)
     {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("The camera bridge requires Windows.");
+
         // Read controller configuration.
         int vid = ReadHexValue(
             _deviceOptions.Vid,

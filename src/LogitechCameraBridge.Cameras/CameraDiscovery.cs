@@ -1,4 +1,6 @@
 using DirectShowLib;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
 using LogitechCameraBridge.Cameras.Interfaces;
 using LogitechCameraBridge.Logger.Interfaces;
 
@@ -32,8 +34,16 @@ public class CameraDiscovery(ICameraBridgeLogger logger) : ICameraDiscovery
             _logger.LogInfo(string.Empty, LogToConsole);
 
             var iid = typeof(IBaseFilter).GUID;
-            device.Mon.BindToObject(null, null, ref iid, out object filter);
-            return filter;
+            Marshal.ThrowExceptionForHR(CreateBindCtx(0, out var bindContext));
+            try
+            {
+                device.Mon.BindToObject(bindContext, null, ref iid, out object filter);
+                return filter;
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(bindContext);
+            }
         }
         finally
         {
@@ -42,6 +52,9 @@ public class CameraDiscovery(ICameraBridgeLogger logger) : ICameraDiscovery
                 device.Dispose();
         }
     }
+
+    [DllImport("ole32.dll", ExactSpelling = true)]
+    private static extern int CreateBindCtx(uint reserved, out IBindCtx bindContext);
 
     private static bool MatchesDevice(DsDevice device, int vid, int pid, string usbInterface)
     {
