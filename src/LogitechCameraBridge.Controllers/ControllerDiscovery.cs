@@ -1,12 +1,15 @@
 using System.ComponentModel;
 using HidSharp;
+using LogitechCameraBridge.Controllers.Interfaces;
 using LogitechCameraBridge.Controllers.Interop;
-using LogitechCameraBridge.Logger;
+using LogitechCameraBridge.Logger.Interfaces;
 
 namespace LogitechCameraBridge.Controllers;
 
-public class ControllerDiscovery : IControllerDiscovery
+public class ControllerDiscovery(ICameraBridgeLogger logger) : IControllerDiscovery
 {
+    private readonly ICameraBridgeLogger _logger = logger;
+
     /// <summary>
     /// Finds a HID collection by VID, PID, and combined usage page/usage.
     /// The caller owns any HID stream opened for the returned device.
@@ -20,32 +23,32 @@ public class ControllerDiscovery : IControllerDiscovery
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("HID collection discovery requires Windows.");
 
-        ConsoleLogger.LogInfo("Detecting Bridge HID controller:", LogToConsole);
+        _logger.LogInfo("Detecting Bridge HID controller:", LogToConsole);
 
         foreach (var device in DeviceList.Local.GetHidDevices(vid, pid))
         {
             try
             {
-                uint deviceUsage = WindowsHidCapabilities.GetFullUsage(device.DevicePath, LogToConsole);
-                ConsoleLogger.LogInfo($"HID candidate: Usage=0x{deviceUsage:X8}, Path={device.DevicePath}", LogToConsole);
+                uint deviceUsage = WindowsHidCapabilities.GetFullUsage(device.DevicePath, _logger, LogToConsole);
+                _logger.LogInfo($"HID candidate: Usage=0x{deviceUsage:X8}, Path={device.DevicePath}", LogToConsole);
 
                 if (deviceUsage != fullUsage)
                     continue;
 
-                ConsoleLogger.LogInfo("HID controller found.", LogToConsole);
-                ConsoleLogger.LogInfo($"VID:       0x{vid:X4}", LogToConsole);
-                ConsoleLogger.LogInfo($"PID:       0x{pid:X4}", LogToConsole);
-                ConsoleLogger.LogInfo($"UsagePage: 0x{fullUsage >> 16:X4}", LogToConsole);
-                ConsoleLogger.LogInfo($"Usage:     0x{fullUsage & 0xFFFF:X4}", LogToConsole);
-                ConsoleLogger.LogInfo($"Path:      {device.DevicePath}", LogToConsole);
-                ConsoleLogger.LogInfo(string.Empty, LogToConsole);
+                _logger.LogInfo("HID controller found.", LogToConsole);
+                _logger.LogInfo($"VID:       0x{vid:X4}", LogToConsole);
+                _logger.LogInfo($"PID:       0x{pid:X4}", LogToConsole);
+                _logger.LogInfo($"UsagePage: 0x{fullUsage >> 16:X4}", LogToConsole);
+                _logger.LogInfo($"Usage:     0x{fullUsage & 0xFFFF:X4}", LogToConsole);
+                _logger.LogInfo($"Path:      {device.DevicePath}", LogToConsole);
+                _logger.LogInfo(string.Empty, LogToConsole);
 
                 return device;
             }
             catch (Exception ex) when (ex is Win32Exception or IOException)
             {
-                ConsoleLogger.LogInfo($"Cannot inspect HID collection '{device.DevicePath}': {ex.Message}",
-                    LogToConsole, isError: true);
+                _logger.LogError($"Cannot inspect HID collection '{device.DevicePath}': {ex.Message}",
+                    LogToConsole);
             }
         }
 

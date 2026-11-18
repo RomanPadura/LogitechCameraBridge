@@ -1,17 +1,20 @@
 using DirectShowLib;
-using LogitechCameraBridge.Logger;
+using LogitechCameraBridge.Cameras.Interfaces;
+using LogitechCameraBridge.Logger.Interfaces;
 
 namespace LogitechCameraBridge.Cameras;
 
-public class CameraDiscovery : ICameraDiscovery
+public class CameraDiscovery(ICameraBridgeLogger logger) : ICameraDiscovery
 {
+    private readonly ICameraBridgeLogger _logger = logger;
+
     /// <inheritdoc />
     public object CreateCameraFilter(int vid, int pid, string usbInterface, bool LogToConsole = false)
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("DirectShow camera discovery requires Windows.");
 
-        ConsoleLogger.LogInfo("Detecting camera to control:", LogToConsole);
+        _logger.LogInfo("Detecting camera to control:", LogToConsole);
         var devices = DsDevice.GetDevicesOfCat(FilterCategory.VideoInputDevice);
 
         try
@@ -20,13 +23,13 @@ public class CameraDiscovery : ICameraDiscovery
                 ?? throw new InvalidOperationException(
                     $"Camera not found. VID=0x{vid:X4}, PID=0x{pid:X4}, Interface={usbInterface}.");
 
-            ConsoleLogger.LogInfo("Camera found.", LogToConsole);
-            ConsoleLogger.LogInfo($"Name:      {device.Name}", LogToConsole);
-            ConsoleLogger.LogInfo($"VID:       0x{vid:X4}", LogToConsole);
-            ConsoleLogger.LogInfo($"PID:       0x{pid:X4}", LogToConsole);
-            ConsoleLogger.LogInfo($"Interface: {usbInterface}", LogToConsole);
-            ConsoleLogger.LogInfo($"Path:      {device.DevicePath}", LogToConsole);
-            ConsoleLogger.LogInfo(string.Empty, LogToConsole);
+            _logger.LogInfo("Camera found.", LogToConsole);
+            _logger.LogInfo($"Name:      {device.Name}", LogToConsole);
+            _logger.LogInfo($"VID:       0x{vid:X4}", LogToConsole);
+            _logger.LogInfo($"PID:       0x{pid:X4}", LogToConsole);
+            _logger.LogInfo($"Interface: {usbInterface}", LogToConsole);
+            _logger.LogInfo($"Path:      {device.DevicePath}", LogToConsole);
+            _logger.LogInfo(string.Empty, LogToConsole);
 
             var iid = typeof(IBaseFilter).GUID;
             device.Mon.BindToObject(null, null, ref iid, out object filter);

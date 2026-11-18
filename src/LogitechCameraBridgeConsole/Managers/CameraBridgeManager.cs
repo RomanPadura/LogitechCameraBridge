@@ -1,11 +1,11 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
-using LogitechCameraBridge.Controllers;
-using LogitechCameraBridge.Cameras;
 using LogitechCameraBridge.Common.Options;
 using Microsoft.Extensions.Options;
 using DirectShowLib;
 using HidSharp;
+using LogitechCameraBridge.Controllers.Interfaces;
+using LogitechCameraBridge.Cameras.Interfaces;
 
 namespace LogitechCameraBridgeConsole.Managers;
 

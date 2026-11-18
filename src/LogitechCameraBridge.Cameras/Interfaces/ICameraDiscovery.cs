@@ -1,4 +1,4 @@
-namespace LogitechCameraBridge.Cameras;
+namespace LogitechCameraBridge.Cameras.Interfaces;
 
 public interface ICameraDiscovery
 {

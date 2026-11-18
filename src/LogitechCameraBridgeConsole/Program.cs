@@ -2,8 +2,12 @@ using LogitechCameraBridgeConsole.Managers;
 using LogitechCameraBridge.Common.Options;
 using LogitechCameraBridge.Controllers;
 using LogitechCameraBridge.Cameras;
+using LogitechCameraBridge.Logger;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using LogitechCameraBridge.Logger.Interfaces;
+using LogitechCameraBridge.Controllers.Interfaces;
+using LogitechCameraBridge.Cameras.Interfaces;
 
 Console.WriteLine("Starting app...");
 
@@ -18,6 +22,7 @@ services.Configure<BridgeControllerDeviceOptions>(
     configuration.GetRequiredSection(BridgeControllerDeviceOptions.SectionName));
 services.Configure<CameraToControlOptions>(
     configuration.GetRequiredSection(CameraToControlOptions.SectionName));
+services.AddSingleton<ICameraBridgeLogger, ConsoleLogger>();
 services.AddSingleton<IControllerDiscovery, ControllerDiscovery>();
 services.AddSingleton<ICameraDiscovery, CameraDiscovery>();
 services.AddSingleton<CameraBridgeManager>();

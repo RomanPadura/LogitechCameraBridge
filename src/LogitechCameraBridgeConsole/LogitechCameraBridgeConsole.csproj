@@ -26,6 +26,7 @@
     <ProjectReference Include="..\LogitechCameraBridge.Controllers\LogitechCameraBridge.Controllers.csproj" />
     <ProjectReference Include="..\LogitechCameraBridge.Cameras\LogitechCameraBridge.Cameras.csproj" />
     <ProjectReference Include="..\LogitechCameraBridge.Common\LogitechCameraBridge.Common.csproj" />
+    <ProjectReference Include="..\LogitechCameraBridge.Logger\LogitechCameraBridge.Logger.csproj" />
   </ItemGroup>
 
 </Project>

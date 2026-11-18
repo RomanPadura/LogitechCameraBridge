@@ -1,6 +1,6 @@
 using HidSharp;
 
-namespace LogitechCameraBridge.Controllers;
+namespace LogitechCameraBridge.Controllers.Interfaces;
 
 public interface IControllerDiscovery
 {
