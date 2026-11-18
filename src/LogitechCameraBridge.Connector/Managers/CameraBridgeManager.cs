@@ -51,7 +51,7 @@ public class CameraBridgeManager(
         string usbInterface =
             _cameraOptions.UsbInterface?.Trim() ?? string.Empty;
 
-        ConfigurationHelper.ValidateUsbInterface(usbInterface);
+        ConfigurationHelper.ValidateUsbInterface(usbInterface, _cameraOptions.UsbInterfacePrefix);
 
         cancellationToken.ThrowIfCancellationRequested();
 

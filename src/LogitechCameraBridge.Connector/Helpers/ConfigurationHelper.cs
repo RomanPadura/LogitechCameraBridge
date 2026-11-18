@@ -14,21 +14,26 @@ internal static class ConfigurationHelper
             throw new InvalidDataException("Button codes 0x00 and 0xFF are reserved.");
     }
 
-    public static void ValidateUsbInterface(string usbInterface)
+    public static void ValidateUsbInterface(string usbInterface, string? prefix)
     {
-        if (usbInterface.Length != 5 ||
+        prefix = prefix?.Trim();
+        if (string.IsNullOrEmpty(prefix))
+            throw new InvalidDataException(
+                $"{CameraToControlOptions.SectionName}.UsbInterfacePrefix must not be empty.");
+
+        if (usbInterface.Length != prefix.Length + 2 ||
             !usbInterface.StartsWith(
-                "MI_",
+                prefix,
                 StringComparison.OrdinalIgnoreCase) ||
             !byte.TryParse(
-                usbInterface.AsSpan(3),
+                usbInterface.AsSpan(prefix.Length),
                 NumberStyles.AllowHexSpecifier,
                 CultureInfo.InvariantCulture,
                 out _))
         {
             throw new InvalidDataException(
                 $"{CameraToControlOptions.SectionName}.UsbInterface " +
-                "must be a USB interface such as MI_00.");
+                $"must start with '{prefix}' followed by two hexadecimal digits, such as {prefix}00.");
         }
     }
 
