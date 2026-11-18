@@ -68,10 +68,8 @@ public class CameraBridgeManager(
         try
         {
             if (filter is not IAMCameraControl camera)
-            {
                 throw new NotSupportedException(
                     "The selected camera does not support IAMCameraControl.");
-            }
 
             ProcessReports(
                 speakerphone,

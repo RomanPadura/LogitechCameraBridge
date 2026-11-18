@@ -23,7 +23,7 @@ services.Configure<BridgeControllerDeviceOptions>(
     configuration.GetRequiredSection(BridgeControllerDeviceOptions.SectionName));
 services.Configure<CameraToControlOptions>(
     configuration.GetRequiredSection(CameraToControlOptions.SectionName));
-services.AddSingleton<ICameraBridgeLogger, ConsoleLogger>();
+services.AddSingleton<ICameraBridgeLogger, CameraBridgeLogger>();
 services.AddSingleton<IControllerDiscovery, ControllerDiscovery>();
 services.AddSingleton<ICameraDiscovery, CameraDiscovery>();
 services.AddSingleton<ICameraBridgeManager, CameraBridgeManager>();
