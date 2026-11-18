@@ -17,4 +17,12 @@ public class BridgeControllerDeviceOptions
     public string ZoomInCode { get; set; } = string.Empty;
 
     public string ZoomOutCode { get; set; } = string.Empty;
+
+    public string PanLeftCode { get; set; } = string.Empty;
+
+    public string PanRightCode { get; set; } = string.Empty;
+
+    public string TiltUpCode { get; set; } = string.Empty;
+
+    public string TiltDownCode { get; set; } = string.Empty;
 }

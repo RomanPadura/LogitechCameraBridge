@@ -68,7 +68,25 @@ public class CameraBridgeManager(
             nameof(BridgeControllerDeviceOptions.ZoomOutCode),
             byte.MaxValue);
 
-        ValidateButtonCodes(zoomInCode, zoomOutCode);
+        int panLeftCode = ReadHexValue(_deviceOptions.PanLeftCode,
+            nameof(BridgeControllerDeviceOptions.PanLeftCode), byte.MaxValue);
+        int panRightCode = ReadHexValue(_deviceOptions.PanRightCode,
+            nameof(BridgeControllerDeviceOptions.PanRightCode), byte.MaxValue);
+        int tiltUpCode = ReadHexValue(_deviceOptions.TiltUpCode,
+            nameof(BridgeControllerDeviceOptions.TiltUpCode), byte.MaxValue);
+        int tiltDownCode = ReadHexValue(_deviceOptions.TiltDownCode,
+            nameof(BridgeControllerDeviceOptions.TiltDownCode), byte.MaxValue);
+
+        ValidateButtonCodes(zoomInCode, zoomOutCode, panLeftCode, panRightCode, tiltUpCode, tiltDownCode);
+        var buttonMappings = new Dictionary<int, (CameraControlProperty Property, int Direction)>
+        {
+            [zoomInCode] = (CameraControlProperty.Zoom, 1),
+            [zoomOutCode] = (CameraControlProperty.Zoom, -1),
+            [panLeftCode] = (CameraControlProperty.Pan, -1),
+            [panRightCode] = (CameraControlProperty.Pan, 1),
+            [tiltUpCode] = (CameraControlProperty.Tilt, 1),
+            [tiltDownCode] = (CameraControlProperty.Tilt, -1)
+        };
 
         // Read camera configuration.
         int cameraVid = ReadHexValue(
@@ -110,8 +128,7 @@ public class CameraBridgeManager(
                 speakerphone,
                 camera,
                 reportId,
-                zoomInCode,
-                zoomOutCode,
+                buttonMappings,
                 cancellationToken);
         }
         finally
@@ -126,48 +143,11 @@ public class CameraBridgeManager(
         HidDevice speakerphone,
         IAMCameraControl camera,
         int reportId,
-        int zoomInCode,
-        int zoomOutCode,
+        IReadOnlyDictionary<int, (CameraControlProperty Property, int Direction)> buttonMappings,
         CancellationToken cancellationToken)
     {
-        const CameraControlProperty property =
-            CameraControlProperty.Zoom;
-
-        // Read camera capabilities.
-        Marshal.ThrowExceptionForHR(camera.GetRange(
-            property,
-            out int min,
-            out int max,
-            out int step,
-            out int defaultValue,
-            out CameraControlFlags capabilities));
-
-        if ((capabilities & CameraControlFlags.Manual) == 0)
-        {
-            throw new NotSupportedException(
-                "The selected camera does not support manual zoom.");
-        }
-
-        if (step <= 0 || min > max)
-        {
-            throw new InvalidOperationException(
-                $"Invalid camera zoom range. " +
-                $"Min={min}, Max={max}, Step={step}.");
-        }
-
-        Marshal.ThrowExceptionForHR(camera.Get(
-            property,
-            out int currentZoom,
-            out _));
-
-        _logger.LogInfo("Camera zoom capabilities:");
-        _logger.LogInfo($"Min:          {min}");
-        _logger.LogInfo($"Max:          {max}");
-        _logger.LogInfo($"Step:         {step}");
-        _logger.LogInfo($"Default:      {defaultValue}");
-        _logger.LogInfo($"Current:      {currentZoom}");
-        _logger.LogInfo($"Capabilities: {capabilities}");
-        _logger.LogInfo(string.Empty);
+        var controls = new CameraControls(camera, _logger);
+        controls.Initialize();
 
         // Open the controller HID stream.
         using var stream = speakerphone.Open();
@@ -176,8 +156,8 @@ public class CameraBridgeManager(
 
         _logger.LogInfo("Listening for controller buttons...");
         _logger.LogInfo($"Report ID: 0x{reportId:X2}");
-        _logger.LogInfo($"Zoom In:   0x{zoomInCode:X2}");
-        _logger.LogInfo($"Zoom Out:  0x{zoomOutCode:X2}");
+        foreach (var (code, command) in buttonMappings)
+            _logger.LogInfo($"Button 0x{code:X2}: {command.Property}, direction={command.Direction}");
         _logger.LogInfo("Press Ctrl+C to stop.");
         _logger.LogInfo(string.Empty);
 
@@ -210,61 +190,18 @@ public class CameraBridgeManager(
             if (buttonCode is 0x00 or 0xFF)
                 continue;
 
-            int direction = buttonCode switch
-            {
-                var code when code == zoomInCode => 1,
-                var code when code == zoomOutCode => -1,
-                _ => 0
-            };
-
-            // Ignore unsupported buttons.
-            if (direction == 0)
-                continue;
-
-            Marshal.ThrowExceptionForHR(camera.Get(
-                property,
-                out int current,
-                out _));
-
-            int next = (int)Math.Clamp(
-                (long)current + direction * (long)step,
-                min,
-                max);
-
-            // Avoid unnecessary camera commands.
-            if (next == current)
-            {
-                _logger.LogInfo(
-                    $"Zoom limit reached: {current}");
-
-                continue;
-            }
-
-            Marshal.ThrowExceptionForHR(camera.Set(
-                property,
-                next,
-                CameraControlFlags.Manual));
-
-            _logger.LogInfo($"Zoom: {current} -> {next}");
+            if (buttonMappings.TryGetValue(buttonCode, out var command))
+                controls.Move(command.Property, command.Direction);
         }
     }
 
-    private static void ValidateButtonCodes(
-        int zoomInCode,
-        int zoomOutCode)
+    private static void ValidateButtonCodes(params int[] codes)
     {
-        if (zoomInCode == zoomOutCode)
-        {
-            throw new InvalidDataException(
-                "ZoomInCode and ZoomOutCode must be different.");
-        }
+        if (codes.Distinct().Count() != codes.Length)
+            throw new InvalidDataException("All button codes must be different.");
 
-        if (zoomInCode is 0x00 or 0xFF ||
-            zoomOutCode is 0x00 or 0xFF)
-        {
-            throw new InvalidDataException(
-                "Button codes 0x00 and 0xFF are reserved.");
-        }
+        if (codes.Any(code => code is 0x00 or 0xFF))
+            throw new InvalidDataException("Button codes 0x00 and 0xFF are reserved.");
     }
 
     private static void ValidateUsbInterface(string usbInterface)
