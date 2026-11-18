@@ -40,7 +40,7 @@ logger.LogInfo(string.Empty);
 try
 {
     var cameraManager = serviceProvider.GetRequiredService<ICameraBridgeManager>();
-    cameraManager.Run(cancellationTokenSource.Token);
+    cameraManager.Start(cancellationTokenSource.Token);
 }
 catch (OperationCanceledException)
     when (cancellationTokenSource.IsCancellationRequested)

@@ -1,4 +1,4 @@
-using System.Globalization;
+using LogitechCameraBridge.Connector.Helpers;
 using System.Runtime.InteropServices;
 using LogitechCameraBridge.Common.Options;
 using Microsoft.Extensions.Options;
@@ -8,6 +8,7 @@ using LogitechCameraBridge.Controllers.Interfaces;
 using LogitechCameraBridge.Cameras.Interfaces;
 using LogitechCameraBridge.Logger.Interfaces;
 using LogitechCameraBridge.Connector.Interfaces;
+using LogitechCameraBridge.Connector.Models;
 
 namespace LogitechCameraBridge.Connector.Managers;
 
@@ -29,72 +30,20 @@ public class CameraBridgeManager(
     private readonly CameraToControlOptions _cameraOptions =
         cameraOptions.Value;
 
-    public void Run(CancellationToken cancellationToken = default)
+    public void Start(CancellationToken cancellationToken = default)
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("The camera bridge requires Windows.");
 
-        // Read controller configuration.
-        int vid = ReadHexValue(
-            _deviceOptions.Vid,
-            nameof(BridgeControllerDeviceOptions.Vid));
-
-        int pid = ReadHexValue(
-            _deviceOptions.Pid,
-            nameof(BridgeControllerDeviceOptions.Pid));
-
-        uint usagePage = (uint)ReadHexValue(
-            _deviceOptions.UsagePage,
-            nameof(BridgeControllerDeviceOptions.UsagePage));
-
-        uint usage = (uint)ReadHexValue(
-            _deviceOptions.Usage,
-            nameof(BridgeControllerDeviceOptions.Usage));
-
-        uint fullUsage = (usagePage << 16) | usage;
-
-        int reportId = ReadHexValue(
-            _deviceOptions.ReportId,
-            nameof(BridgeControllerDeviceOptions.ReportId),
-            byte.MaxValue);
-
-        int zoomInCode = ReadHexValue(
-            _deviceOptions.ZoomInCode,
-            nameof(BridgeControllerDeviceOptions.ZoomInCode),
-            byte.MaxValue);
-
-        int zoomOutCode = ReadHexValue(
-            _deviceOptions.ZoomOutCode,
-            nameof(BridgeControllerDeviceOptions.ZoomOutCode),
-            byte.MaxValue);
-
-        int panLeftCode = ReadHexValue(_deviceOptions.PanLeftCode,
-            nameof(BridgeControllerDeviceOptions.PanLeftCode), byte.MaxValue);
-        int panRightCode = ReadHexValue(_deviceOptions.PanRightCode,
-            nameof(BridgeControllerDeviceOptions.PanRightCode), byte.MaxValue);
-        int tiltUpCode = ReadHexValue(_deviceOptions.TiltUpCode,
-            nameof(BridgeControllerDeviceOptions.TiltUpCode), byte.MaxValue);
-        int tiltDownCode = ReadHexValue(_deviceOptions.TiltDownCode,
-            nameof(BridgeControllerDeviceOptions.TiltDownCode), byte.MaxValue);
-
-        ValidateButtonCodes(zoomInCode, zoomOutCode, panLeftCode, panRightCode, tiltUpCode, tiltDownCode);
-        var buttonMappings = new Dictionary<int, (CameraControlProperty Property, int Direction)>
-        {
-            [zoomInCode] = (CameraControlProperty.Zoom, 1),
-            [zoomOutCode] = (CameraControlProperty.Zoom, -1),
-            [panLeftCode] = (CameraControlProperty.Pan, -1),
-            [panRightCode] = (CameraControlProperty.Pan, 1),
-            [tiltUpCode] = (CameraControlProperty.Tilt, 1),
-            [tiltDownCode] = (CameraControlProperty.Tilt, -1)
-        };
+        var controller = ReadControllerConfiguration();
 
         // Read camera configuration.
-        int cameraVid = ReadHexValue(
+        int cameraVid = ConfigurationHelper.ReadHexValue(
             _cameraOptions.Vid,
             nameof(CameraToControlOptions.Vid),
             sectionName: CameraToControlOptions.SectionName);
 
-        int cameraPid = ReadHexValue(
+        int cameraPid = ConfigurationHelper.ReadHexValue(
             _cameraOptions.Pid,
             nameof(CameraToControlOptions.Pid),
             sectionName: CameraToControlOptions.SectionName);
@@ -102,13 +51,13 @@ public class CameraBridgeManager(
         string usbInterface =
             _cameraOptions.UsbInterface?.Trim() ?? string.Empty;
 
-        ValidateUsbInterface(usbInterface);
+        ConfigurationHelper.ValidateUsbInterface(usbInterface);
 
         cancellationToken.ThrowIfCancellationRequested();
 
         // Find the HID controller.
         var speakerphone = _controllerDiscovery.FindController(
-            vid, pid, fullUsage);
+            controller.Vid, controller.Pid, controller.FullUsage);
 
         // Find and initialize the camera filter.
         var filter = _cameraDiscovery.CreateCameraFilter(
@@ -127,8 +76,8 @@ public class CameraBridgeManager(
             ProcessReports(
                 speakerphone,
                 camera,
-                reportId,
-                buttonMappings,
+                controller.ReportId,
+                controller.ButtonMappings,
                 cancellationToken);
         }
         finally
@@ -137,6 +86,61 @@ public class CameraBridgeManager(
         }
 
         _logger.LogInfo("Camera bridge stopped.");
+    }
+
+    private ControllerConfiguration ReadControllerConfiguration()
+    {
+        // Read controller configuration.
+        int vid = ConfigurationHelper.ReadHexValue(
+            _deviceOptions.Vid,
+            nameof(BridgeControllerDeviceOptions.Vid));
+
+        int pid = ConfigurationHelper.ReadHexValue(
+            _deviceOptions.Pid,
+            nameof(BridgeControllerDeviceOptions.Pid));
+
+        uint usagePage = (uint)ConfigurationHelper.ReadHexValue(
+            _deviceOptions.UsagePage,
+            nameof(BridgeControllerDeviceOptions.UsagePage));
+
+        uint usage = (uint)ConfigurationHelper.ReadHexValue(
+            _deviceOptions.Usage,
+            nameof(BridgeControllerDeviceOptions.Usage));
+
+        uint fullUsage = (usagePage << 16) | usage;
+
+        int reportId = ConfigurationHelper.ReadHexValue(
+            _deviceOptions.ReportId,
+            nameof(BridgeControllerDeviceOptions.ReportId),
+            byte.MaxValue);
+
+        int zoomInCode = ConfigurationHelper.ReadHexValue(_deviceOptions.ZoomInCode,
+            nameof(BridgeControllerDeviceOptions.ZoomInCode), byte.MaxValue);
+
+        int zoomOutCode = ConfigurationHelper.ReadHexValue(_deviceOptions.ZoomOutCode,
+            nameof(BridgeControllerDeviceOptions.ZoomOutCode), byte.MaxValue);
+
+        int panLeftCode = ConfigurationHelper.ReadHexValue(_deviceOptions.PanLeftCode,
+            nameof(BridgeControllerDeviceOptions.PanLeftCode), byte.MaxValue);
+        int panRightCode = ConfigurationHelper.ReadHexValue(_deviceOptions.PanRightCode,
+            nameof(BridgeControllerDeviceOptions.PanRightCode), byte.MaxValue);
+        int tiltUpCode = ConfigurationHelper.ReadHexValue(_deviceOptions.TiltUpCode,
+            nameof(BridgeControllerDeviceOptions.TiltUpCode), byte.MaxValue);
+        int tiltDownCode = ConfigurationHelper.ReadHexValue(_deviceOptions.TiltDownCode,
+            nameof(BridgeControllerDeviceOptions.TiltDownCode), byte.MaxValue);
+
+        ConfigurationHelper.ValidateButtonCodes(zoomInCode, zoomOutCode, panLeftCode, panRightCode, tiltUpCode, tiltDownCode);
+        var buttonMappings = new Dictionary<int, (CameraControlProperty Property, int Direction)>
+        {
+            [zoomInCode] = (CameraControlProperty.Zoom, 1),
+            [zoomOutCode] = (CameraControlProperty.Zoom, -1),
+            [panLeftCode] = (CameraControlProperty.Pan, -1),
+            [panRightCode] = (CameraControlProperty.Pan, 1),
+            [tiltUpCode] = (CameraControlProperty.Tilt, 1),
+            [tiltDownCode] = (CameraControlProperty.Tilt, -1)
+        };
+
+        return new ControllerConfiguration(vid, pid, fullUsage, reportId, buttonMappings);
     }
 
     private void ProcessReports(
@@ -195,60 +199,4 @@ public class CameraBridgeManager(
         }
     }
 
-    private static void ValidateButtonCodes(params int[] codes)
-    {
-        if (codes.Distinct().Count() != codes.Length)
-            throw new InvalidDataException("All button codes must be different.");
-
-        if (codes.Any(code => code is 0x00 or 0xFF))
-            throw new InvalidDataException("Button codes 0x00 and 0xFF are reserved.");
-    }
-
-    private static void ValidateUsbInterface(string usbInterface)
-    {
-        if (usbInterface.Length != 5 ||
-            !usbInterface.StartsWith(
-                "MI_",
-                StringComparison.OrdinalIgnoreCase) ||
-            !byte.TryParse(
-                usbInterface.AsSpan(3),
-                NumberStyles.AllowHexSpecifier,
-                CultureInfo.InvariantCulture,
-                out _))
-        {
-            throw new InvalidDataException(
-                $"{CameraToControlOptions.SectionName}.UsbInterface " +
-                "must be a USB interface such as MI_00.");
-        }
-    }
-
-    private static int ReadHexValue(
-        string? value,
-        string name,
-        int maxValue = ushort.MaxValue,
-        string sectionName = BridgeControllerDeviceOptions.SectionName)
-    {
-        var hex = value.AsSpan().Trim();
-
-        if (hex.StartsWith(
-            "0x",
-            StringComparison.OrdinalIgnoreCase))
-        {
-            hex = hex[2..];
-        }
-
-        if (!ushort.TryParse(
-                hex,
-                NumberStyles.AllowHexSpecifier,
-                CultureInfo.InvariantCulture,
-                out ushort id)
-            || id > maxValue)
-        {
-            throw new InvalidDataException(
-                $"{sectionName}.{name} must be a hexadecimal " +
-                $"value between 0x00 and 0x{maxValue:X}.");
-        }
-
-        return id;
-    }
 }
