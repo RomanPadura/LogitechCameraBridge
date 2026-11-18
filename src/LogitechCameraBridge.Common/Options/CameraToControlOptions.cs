@@ -1,4 +1,4 @@
-namespace LogitechCameraBridgeConsole.Options;
+namespace LogitechCameraBridge.Common.Options;
 
 public class CameraToControlOptions
 {

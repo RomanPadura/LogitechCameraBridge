@@ -1,5 +1,7 @@
 using LogitechCameraBridgeConsole.Managers;
-using LogitechCameraBridgeConsole.Options;
+using LogitechCameraBridge.Common.Options;
+using LogitechCameraBridge.Controllers;
+using LogitechCameraBridge.Cameras;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +18,8 @@ services.Configure<BridgeControllerDeviceOptions>(
     configuration.GetRequiredSection(BridgeControllerDeviceOptions.SectionName));
 services.Configure<CameraToControlOptions>(
     configuration.GetRequiredSection(CameraToControlOptions.SectionName));
+services.AddSingleton<IControllerDiscovery, ControllerDiscovery>();
+services.AddSingleton<ICameraDiscovery, CameraDiscovery>();
 services.AddSingleton<CameraBridgeManager>();
 Console.WriteLine("Services are build successfully...");
 Console.WriteLine();

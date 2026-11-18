@@ -1,8 +1,8 @@
 using System.Globalization;
-using System.ComponentModel;
 using System.Runtime.InteropServices;
-using LogitechCameraBridgeConsole.Interop;
-using LogitechCameraBridgeConsole.Options;
+using LogitechCameraBridge.Controllers;
+using LogitechCameraBridge.Cameras;
+using LogitechCameraBridge.Common.Options;
 using Microsoft.Extensions.Options;
 using DirectShowLib;
 using HidSharp;
@@ -11,8 +11,13 @@ namespace LogitechCameraBridgeConsole.Managers;
 
 public class CameraBridgeManager(
     IOptions<BridgeControllerDeviceOptions> deviceOptions,
-    IOptions<CameraToControlOptions> cameraOptions)
+    IOptions<CameraToControlOptions> cameraOptions,
+    IControllerDiscovery controllerDiscovery,
+    ICameraDiscovery cameraDiscovery)
 {
+    private readonly IControllerDiscovery _controllerDiscovery = controllerDiscovery;
+    private readonly ICameraDiscovery _cameraDiscovery = cameraDiscovery;
+
     private readonly BridgeControllerDeviceOptions _deviceOptions =
         deviceOptions.Value;
 
@@ -76,23 +81,15 @@ public class CameraBridgeManager(
         cancellationToken.ThrowIfCancellationRequested();
 
         // Find the HID controller.
-        Console.WriteLine("Detecting Bridge HID controller:");
-        var speakerphone = FindController(vid, pid, fullUsage);
-
-        Console.WriteLine("HID controller found.");
-        Console.WriteLine($"VID:       0x{vid:X4}");
-        Console.WriteLine($"PID:       0x{pid:X4}");
-        Console.WriteLine($"UsagePage: 0x{usagePage:X4}");
-        Console.WriteLine($"Usage:     0x{usage:X4}");
-        Console.WriteLine($"Path:      {speakerphone.DevicePath}");
-        Console.WriteLine();
+        var speakerphone = _controllerDiscovery.FindController(
+            vid, pid, fullUsage, LogToConsole: true);
 
         // Find and initialize the camera filter.
-        Console.WriteLine("Detecting camera to control:");
-        var filter = CreateCameraFilter(
+        var filter = _cameraDiscovery.CreateCameraFilter(
             cameraVid,
             cameraPid,
-            usbInterface);
+            usbInterface,
+            LogToConsole: true);
 
         try
         {
@@ -116,80 +113,6 @@ public class CameraBridgeManager(
         }
 
         Console.WriteLine("Camera bridge stopped.");
-    }
-
-    private static HidDevice FindController(
-        int vid,
-        int pid,
-        uint fullUsage)
-    {
-        if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException("HID collection discovery requires Windows.");
-
-        foreach (var device in DeviceList.Local.GetHidDevices(vid, pid))
-        {
-            try
-            {
-                uint deviceUsage = WindowsHidCapabilities.GetFullUsage(device.DevicePath);
-                Console.WriteLine($"HID candidate: Usage=0x{deviceUsage:X8}, Path={device.DevicePath}");
-                if (deviceUsage == fullUsage)
-                    return device;
-            }
-            catch (Exception ex) when (ex is Win32Exception or IOException)
-            {
-                Console.Error.WriteLine($"Cannot inspect HID collection '{device.DevicePath}': {ex.Message}");
-            }
-        }
-
-        throw new InvalidOperationException(
-            $"HID controller not found. " +
-            $"VID=0x{vid:X4}, PID=0x{pid:X4}, " +
-            $"Usage=0x{fullUsage:X8}. See any capability query errors above.");
-    }
-
-    private object CreateCameraFilter(
-        int vid,
-        int pid,
-        string usbInterface)
-    {
-        var devices = DsDevice.GetDevicesOfCat(
-            FilterCategory.VideoInputDevice);
-
-        try
-        {
-            var device = devices.FirstOrDefault(d =>
-                MatchesDevice(d, vid, pid, usbInterface))
-                ?? throw new InvalidOperationException(
-                    $"Camera '{_cameraOptions.Device}' not found. " +
-                    $"VID=0x{vid:X4}, PID=0x{pid:X4}, " +
-                    $"Interface={usbInterface}.");
-
-            Console.WriteLine("Camera found.");
-            Console.WriteLine($"Name:      {device.Name}");
-            Console.WriteLine($"VID:       0x{vid:X4}");
-            Console.WriteLine($"PID:       0x{pid:X4}");
-            Console.WriteLine($"Interface: {usbInterface}");
-            Console.WriteLine($"Path:      {device.DevicePath}");
-            Console.WriteLine();
-
-            var iid = typeof(IBaseFilter).GUID;
-
-            device.Mon.BindToObject(
-                null,
-                null,
-                ref iid,
-                out object filter);
-
-            return filter;
-        }
-        finally
-        {
-            // Release all enumerated COM monikers.
-            foreach (var device in devices)
-            {
-                device.Dispose();
-            }
-        }
     }
 
     private static void ProcessReports(
@@ -317,27 +240,6 @@ public class CameraBridgeManager(
 
             Console.WriteLine($"Zoom: {current} -> {next}");
         }
-    }
-
-    private static bool MatchesDevice(
-        DsDevice device,
-        int vid,
-        int pid,
-        string usbInterface)
-    {
-        string? devicePath = device.DevicePath;
-
-        if (string.IsNullOrEmpty(devicePath))
-            return false;
-
-        return devicePath.Contains(
-                   $"vid_{vid:X4}&pid_{pid:X4}",
-                   StringComparison.OrdinalIgnoreCase)
-               && devicePath
-                   .Split('&', '#')
-                   .Contains(
-                       usbInterface,
-                       StringComparer.OrdinalIgnoreCase);
     }
 
     private static void ValidateButtonCodes(
