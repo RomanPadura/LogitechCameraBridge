@@ -20,12 +20,12 @@ public sealed class TrayIcon : IDisposable
     private readonly ToolStripMenuItem _controlsItem = new("Camera controls");
     private readonly ToolStripMenuItem _aboutItem = new("About");
     private readonly ToolStripMenuItem _updateItem = new("Check for updates...");
-    private readonly ToolStripLabel _zoomValue = new("Zoom: Not checked");
-    private readonly ToolStripLabel _panValue = new("Pan: Not checked");
-    private readonly ToolStripLabel _tiltValue = new("Tilt: Not checked");
-    private readonly ToolStripLabel _controllerStatus = new("Logitech Controller: Checking...");
-    private readonly ToolStripLabel _cameraStatus = new("Camera: Checking...");
-    private readonly ToolStripLabel _activeStatus = new("Active: false");
+    private readonly TrayMenuLabel _zoomValue = new("Zoom: Not checked");
+    private readonly TrayMenuLabel _panValue = new("Pan: Not checked");
+    private readonly TrayMenuLabel _tiltValue = new("Tilt: Not checked");
+    private readonly TrayMenuLabel _controllerStatus = new("Logitech Controller: Checking...");
+    private readonly TrayMenuLabel _cameraStatus = new("Camera: Checking...");
+    private readonly TrayMenuLabel _activeStatus = new("Active: false");
     private readonly NotifyIcon _notifyIcon;
     private CameraMenuViewModel? _cameraMenu;
     private StatusViewModel? _status;
@@ -45,7 +45,7 @@ public sealed class TrayIcon : IDisposable
         _menu.Items.Add(_controlsItem);
         _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Cameras unavailable") { Enabled = false });
         _menu.Items.Add(_camerasItem);
-        _aboutItem.DropDownItems.Add(new ToolStripLabel($"Version: {about.Version}"));
+        _aboutItem.DropDownItems.Add(new TrayMenuLabel($"Version: {about.Version}"));
         _updateItem.Click += OnUpdateClick;
         _aboutItem.DropDownItems.Add(_updateItem);
         _menu.Items.Add(_aboutItem);
@@ -88,7 +88,7 @@ public sealed class TrayIcon : IDisposable
         RenderControl(_tiltValue, "Tilt", capabilities.Tilt, capabilities.TiltValue);
     }
 
-    private static void RenderControl(ToolStripLabel label, string name, CameraControlSupport support, CameraControlValue? value)
+    private static void RenderControl(TrayMenuLabel label, string name, CameraControlSupport support, CameraControlValue? value)
     {
         string text = support switch
         {
