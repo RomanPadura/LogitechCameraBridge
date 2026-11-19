@@ -34,8 +34,12 @@ public class CameraBridgeManager(
         => Start(cancellationToken, static () => { });
 
     public void Start(CancellationToken cancellationToken, Action onReady)
+        => Start(cancellationToken, onReady, static _ => { });
+
+    public void Start(CancellationToken cancellationToken, Action onReady, Action<CameraControlCapabilities> onCapabilities)
     {
         ArgumentNullException.ThrowIfNull(onReady);
+        ArgumentNullException.ThrowIfNull(onCapabilities);
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("The camera bridge requires Windows.");
 
@@ -49,9 +53,12 @@ public class CameraBridgeManager(
         try
         {
             if (filter is not IAMCameraControl camera)
+            {
+                onCapabilities(CameraControlCapabilities.NotSupported);
                 throw new NotSupportedException("The selected camera does not support IAMCameraControl.");
+            }
             ProcessReports(speakerphone, camera, controller.ReportId, controller.ButtonMappings,
-                cancellationToken, onReady);
+                cancellationToken, onReady, onCapabilities);
         }
         finally
         {
@@ -149,11 +156,12 @@ public class CameraBridgeManager(
         int reportId,
         IReadOnlyDictionary<int, (CameraControlProperty Property, int Direction)> buttonMappings,
         CancellationToken cancellationToken,
-        Action onReady)
+        Action onReady,
+        Action<CameraControlCapabilities> onCapabilities)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var controls = new CameraControls(camera, _logger);
-        controls.Initialize();
+        controls.Initialize(onCapabilities);
 
         cancellationToken.ThrowIfCancellationRequested();
 

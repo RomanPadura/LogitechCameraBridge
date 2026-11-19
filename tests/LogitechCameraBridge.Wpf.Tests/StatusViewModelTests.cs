@@ -2,6 +2,7 @@ using HidSharp;
 using LogitechCameraBridge.Cameras.Interfaces;
 using LogitechCameraBridge.Cameras.Models;
 using LogitechCameraBridge.Common.Options;
+using LogitechCameraBridge.Connector.Models;
 using LogitechCameraBridge.Controllers;
 using LogitechCameraBridge.Controllers.Interfaces;
 using LogitechCameraBridge.Logger.Interfaces;
@@ -13,6 +14,22 @@ namespace LogitechCameraBridge.Wpf.Tests;
 
 public class StatusViewModelTests
 {
+    [Fact]
+    public Task ControlValuesUpdateOnUiWithoutRescanningOrRestarting() => MainViewModelTests.OnDispatcherAsync(async () =>
+    {
+        var f = new Fixture();
+        await f.Model.InitializeAsync();
+        var capabilities = new CameraControlCapabilities(CameraControlSupport.Supported,
+            CameraControlSupport.NotSupported, CameraControlSupport.Error, new(150, 100, 400));
+        f.Session.Progress!.Report(new(false, Capabilities: capabilities));
+        await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        Assert.Equal(capabilities, f.Model.Capabilities);
+        Assert.True(f.Model.Active);
+        Assert.Equal(1, f.Session.Starts);
+        Assert.Equal(1, f.Cameras.Scans);
+        await f.Model.ShutdownAsync();
+    });
+
     [Fact]
     public Task StartupRunsWithoutKeyboardInputAndDoesNotRetry() => MainViewModelTests.OnDispatcherAsync(async () =>
     {

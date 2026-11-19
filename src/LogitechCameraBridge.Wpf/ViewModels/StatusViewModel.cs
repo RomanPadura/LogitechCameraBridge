@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LogitechCameraBridge.Common.Options;
+using LogitechCameraBridge.Connector.Models;
 using LogitechCameraBridge.Controllers;
 using LogitechCameraBridge.Controllers.Interfaces;
 using LogitechCameraBridge.Logger.Interfaces;
@@ -35,6 +36,9 @@ public partial class StatusViewModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TrayState))]
     private bool _isInitializing = true;
+
+    [ObservableProperty]
+    private CameraControlCapabilities _capabilities = CameraControlCapabilities.NotChecked;
 
     private bool _cameraNotSelected;
 
@@ -121,8 +125,12 @@ public partial class StatusViewModel(
 
         cameraOptions.Value.DevicePath = found.DevicePath;
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var uiProgress = new Progress<BridgeNotification>(_ =>
+        var uiProgress = new Progress<BridgeNotification>(notification =>
         {
+            if (_closing)
+                return;
+            if (notification.Capabilities is { } capabilities)
+                Capabilities = capabilities;
             // Optional-axis initialization warnings do not invalidate otherwise working Zoom.
             if (!_closing && activity.Snapshot.Error is { } error)
                 Fail(new InvalidOperationException(error));

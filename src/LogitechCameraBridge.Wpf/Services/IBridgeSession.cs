@@ -1,3 +1,5 @@
+using LogitechCameraBridge.Connector.Models;
+
 namespace LogitechCameraBridge.Wpf.Services;
 
 public interface IBridgeSession
@@ -6,4 +8,4 @@ public interface IBridgeSession
     Task RunAsync(IProgress<BridgeNotification> progress, CancellationToken cancellationToken);
 }
 
-public sealed record BridgeNotification(bool IsReady, string? Error = null);
+public sealed record BridgeNotification(bool IsReady, string? Error = null, CameraControlCapabilities? Capabilities = null);

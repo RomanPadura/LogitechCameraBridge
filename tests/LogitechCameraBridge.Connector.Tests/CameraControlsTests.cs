@@ -1,11 +1,90 @@
 using System.Runtime.InteropServices;
 using DirectShowLib;
 using LogitechCameraBridge.Logger.Interfaces;
+using LogitechCameraBridge.Connector.Models;
 
 namespace LogitechCameraBridge.Connector.Tests;
 
 public class CameraControlsTests
 {
+    [Fact]
+    public void InitializationReportsValuesAndRangesWithoutMovingCamera()
+    {
+        var camera = new FakeCamera();
+        CameraControlCapabilities? result = null;
+        new CameraControls(camera, new RecordingLogger()).Initialize(value => result = value);
+        Assert.NotNull(result);
+        Assert.Equal(CameraControlSupport.Supported, result.Zoom);
+        Assert.Equal(new CameraControlValue(101, 100, 400), result.ZoomValue);
+        Assert.Equal(new CameraControlValue(0, -10, 10), result.PanValue);
+        Assert.Equal(new CameraControlValue(0, -10, 10), result.TiltValue);
+        Assert.Empty(camera.Sets);
+    }
+
+    [Theory]
+    [InlineData(unchecked((int)0x80004001), CameraControlSupport.NotSupported)]
+    [InlineData(unchecked((int)0x80070490), CameraControlSupport.NotSupported)]
+    [InlineData(unchecked((int)0x80070492), CameraControlSupport.NotSupported)]
+    [InlineData(unchecked((int)0x80004005), CameraControlSupport.Error)]
+    public void UnsupportedPropertyIsDistinctFromDriverFailure(int hresult, CameraControlSupport expected)
+    {
+        var camera = new FakeCamera();
+        camera.States[CameraControlProperty.Pan].RangeResult = hresult;
+        CameraControlCapabilities? result = null;
+        new CameraControls(camera, new RecordingLogger()).Initialize(value => result = value);
+        Assert.Equal(expected, result!.Pan);
+        Assert.Null(result.PanValue);
+        Assert.Equal(CameraControlSupport.Supported, result.Zoom);
+        Assert.Equal(CameraControlSupport.Supported, result.Tilt);
+        Assert.Empty(camera.Sets);
+    }
+
+    [Fact]
+    public void InvalidRangeIsErrorAndAutoOnlyIsNotSupported()
+    {
+        var camera = new FakeCamera();
+        camera.States[CameraControlProperty.Pan].Step = 0;
+        camera.States[CameraControlProperty.Tilt].Capabilities = CameraControlFlags.Auto;
+        CameraControlCapabilities? result = null;
+        new CameraControls(camera, new RecordingLogger()).Initialize(value => result = value);
+        Assert.Equal(CameraControlSupport.Error, result!.Pan);
+        Assert.Equal(CameraControlSupport.NotSupported, result.Tilt);
+    }
+
+    [Fact]
+    public void ReportsAllAxesBeforeRequiredZoomFailure()
+    {
+        var camera = new FakeCamera();
+        camera.States[CameraControlProperty.Zoom].RangeResult = FakeCamera.NotImplemented;
+        CameraControlCapabilities? result = null;
+        var controls = new CameraControls(camera, new RecordingLogger());
+        Assert.Throws<COMException>(() => controls.Initialize(value => result = value));
+        Assert.Equal(CameraControlSupport.NotSupported, result!.Zoom);
+        Assert.Equal(CameraControlSupport.Supported, result.Pan);
+        Assert.Equal(CameraControlSupport.Supported, result.Tilt);
+        Assert.Empty(camera.Sets);
+    }
+
+    [Fact]
+    public void MovementPublishesCurrentValuesAndLimitWithoutExtraSet()
+    {
+        var camera = new FakeCamera();
+        CameraControlCapabilities? result = null;
+        var controls = new CameraControls(camera, new RecordingLogger());
+        controls.Initialize(value => result = value);
+        controls.Move(CameraControlProperty.Pan, 1);
+        Assert.Equal(new CameraControlValue(3, -10, 10), result!.PanValue);
+        Assert.Equal(new CameraControlValue(101, 100, 400), result.ZoomValue);
+        camera.States[CameraControlProperty.Pan].Current = 10;
+        controls.Move(CameraControlProperty.Pan, 1);
+        Assert.Equal(10, result!.PanValue!.Current);
+        Assert.Single(camera.Sets);
+        camera.States[CameraControlProperty.Pan].GetResult = unchecked((int)0x80004005);
+        controls.Move(CameraControlProperty.Pan, -1);
+        Assert.Equal(CameraControlSupport.Error, result!.Pan);
+        Assert.Null(result.PanValue);
+    }
+
     [Theory]
     [InlineData(CameraControlProperty.Pan, 1, 3)]
     [InlineData(CameraControlProperty.Pan, -1, -3)]

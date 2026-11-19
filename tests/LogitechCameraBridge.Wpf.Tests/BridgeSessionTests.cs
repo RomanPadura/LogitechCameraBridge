@@ -1,5 +1,6 @@
 using LogitechCameraBridge.Common.Options;
 using LogitechCameraBridge.Connector.Interfaces;
+using LogitechCameraBridge.Connector.Models;
 using LogitechCameraBridge.Logger;
 using LogitechCameraBridge.Wpf.Services;
 using Microsoft.Extensions.Options;
@@ -8,6 +9,27 @@ namespace LogitechCameraBridge.Wpf.Tests;
 
 public class BridgeSessionTests
 {
+    [Fact]
+    public async Task TypedCapabilityPayloadIsForwardedBeforeReadiness()
+    {
+        var notifications = new List<BridgeNotification>();
+        await CreateSession(new CapabilityManager()).RunAsync(new InlineProgress(notifications.Add), default);
+        Assert.Collection(notifications,
+            notification => Assert.Equal(CameraControlCapabilities.NotSupported, notification.Capabilities),
+            notification => Assert.True(notification.IsReady));
+    }
+
+    private sealed class CapabilityManager : ICameraBridgeManager
+    {
+        public void Start(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Start(CancellationToken cancellationToken, Action onReady) => throw new NotSupportedException();
+        public void Start(CancellationToken cancellationToken, Action onReady, Action<CameraControlCapabilities> capabilities)
+        {
+            capabilities(CameraControlCapabilities.NotSupported);
+            onReady();
+        }
+    }
+
     [Fact]
     public async Task CancellationWaitsForCleanupOnTheSameMtaWorkerAndRejectsOverlap()
     {

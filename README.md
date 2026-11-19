@@ -32,7 +32,7 @@ dotnet run --project src/LogitechCameraBridge.Wpf
 ```
 
 The app uses .NET 10 WPF, MVVM, DI and the shared console appSettings.json. It has no startup
-window or taskbar button. Its tray menu contains Status, Cameras, Restart and Exit.
+window or taskbar button. Its tray menu contains Status, Camera controls, Cameras, Restart and Exit.
 
 Startup performs one attempt:
 
@@ -80,6 +80,29 @@ Errors take priority over orange. The tooltip also names the state. The icon has
 and transparent outer corners for contrast on light/dark taskbars. The glyph and its MIT license
 are included under `src/LogitechCameraBridge.Wpf/Assets`; the license is copied to build/publish output.
 Source: [Microsoft Fluent System Icons](https://github.com/microsoft/fluentui-system-icons).
+
+### Camera controls
+
+The Camera controls submenu contains three read-only rows, for example:
+
+```text
+Zoom: 100 (min: 100, max: 400)
+Pan: 0 (min: -16, max: 16)
+Tilt: 0 (min: -16, max: 16)
+```
+
+The number is the last value read from the driver; parentheses show min and max labels. Values are read during
+normal bridge initialization and after commands, including a read after each successful Set. An
+attempt at a limit refreshes the value without another Set. No timer, video capture or additional
+movement is used for this display. Changes made by other apps appear after the next bridge command
+for that axis; opening the submenu does not poll the camera.
+
+Unavailable axes show Not supported (manual control unavailable or an explicit unsupported response).
+Unexpected driver failures/invalid ranges show Error in red; details are logged. Before an axis has
+been examined, it shows Not checked. All axes are reported even when required Zoom is unavailable;
+Zoom remains required for startup and unavailable optional Pan/Tilt do not block Zoom.
+These are driver-reported capabilities, not proof of physical movement. The submenu follows the
+startup camera; choosing another camera saves/restarts the application as before.
 
 ### Keyboard simulator
 

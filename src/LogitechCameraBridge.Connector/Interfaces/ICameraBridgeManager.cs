@@ -1,3 +1,5 @@
+using LogitechCameraBridge.Connector.Models;
+
 namespace LogitechCameraBridge.Connector.Interfaces;
 
 public interface ICameraBridgeManager
@@ -13,4 +15,8 @@ public interface ICameraBridgeManager
     /// All device resources are released before this method returns or throws.
     /// </summary>
     void Start(CancellationToken cancellationToken, Action onReady);
+
+    /// <summary>Reports driver capabilities on the worker, before readiness or a Zoom startup failure.</summary>
+    void Start(CancellationToken cancellationToken, Action onReady, Action<CameraControlCapabilities> onCapabilities)
+        => Start(cancellationToken, onReady);
 }

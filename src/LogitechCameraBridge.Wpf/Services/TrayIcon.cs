@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 using LogitechCameraBridge.Wpf.ViewModels;
+using LogitechCameraBridge.Connector.Models;
 
 namespace LogitechCameraBridge.Wpf.Services;
 
@@ -15,6 +16,10 @@ public sealed class TrayIcon : IDisposable
     private readonly ToolStripMenuItem _restartItem = new("Restart");
     private readonly ToolStripMenuItem _camerasItem = new("Cameras");
     private readonly ToolStripMenuItem _statusItem = new("Status");
+    private readonly ToolStripMenuItem _controlsItem = new("Camera controls");
+    private readonly ToolStripLabel _zoomValue = new("Zoom: Not checked");
+    private readonly ToolStripLabel _panValue = new("Pan: Not checked");
+    private readonly ToolStripLabel _tiltValue = new("Tilt: Not checked");
     private readonly ToolStripLabel _controllerStatus = new("Logitech Controller: Checking...");
     private readonly ToolStripLabel _cameraStatus = new("Camera: Checking...");
     private readonly ToolStripLabel _activeStatus = new("Active: false");
@@ -32,6 +37,8 @@ public sealed class TrayIcon : IDisposable
         _restartItem.Click += OnRestartClick;
         _statusItem.DropDownItems.AddRange([_controllerStatus, _cameraStatus, _activeStatus]);
         _menu.Items.Add(_statusItem);
+        _controlsItem.DropDownItems.AddRange([_zoomValue, _panValue, _tiltValue]);
+        _menu.Items.Add(_controlsItem);
         _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Cameras unavailable") { Enabled = false });
         _menu.Items.Add(_camerasItem);
         _menu.Items.Add(_restartItem);
@@ -67,6 +74,26 @@ public sealed class TrayIcon : IDisposable
         _activeStatus.Text = _status.Active ? "Active: true" : "Active: false";
         _activeStatus.ForeColor = _status.Active ? SystemColors.MenuText : Color.Red;
         SetIconState(_status.TrayState);
+        var capabilities = _status.Capabilities;
+        RenderControl(_zoomValue, "Zoom", capabilities.Zoom, capabilities.ZoomValue);
+        RenderControl(_panValue, "Pan", capabilities.Pan, capabilities.PanValue);
+        RenderControl(_tiltValue, "Tilt", capabilities.Tilt, capabilities.TiltValue);
+    }
+
+    private static void RenderControl(ToolStripLabel label, string name, CameraControlSupport support, CameraControlValue? value)
+    {
+        string text = support switch
+        {
+            CameraControlSupport.Supported when value is not null => $"{value.Current} (min: {value.Min}, max: {value.Max})",
+            CameraControlSupport.Supported => "Supported",
+            CameraControlSupport.NotSupported => "Not supported",
+            CameraControlSupport.Error => "Error",
+            _ => "Not checked"
+        };
+        label.Text = $"{name}: {text}";
+        label.ForeColor = support == CameraControlSupport.Error ? Color.Red
+            : support == CameraControlSupport.NotSupported || support == CameraControlSupport.NotChecked
+                ? SystemColors.GrayText : SystemColors.MenuText;
     }
 
     private void SetIconState(TrayIconState state)
@@ -100,6 +127,7 @@ public sealed class TrayIcon : IDisposable
         _restartItem.Enabled = false;
         _camerasItem.Enabled = false;
         _statusItem.Enabled = false;
+        _controlsItem.Enabled = false;
     }
 
     private void OnCameraMenuChanged(object? sender, PropertyChangedEventArgs e) => RenderCameras();

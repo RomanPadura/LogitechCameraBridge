@@ -95,7 +95,7 @@ runtime errors to the ViewModel. The original JSON file is linked into the WPF o
 
 ## Tray application: one startup attempt
 
-App creates no startup window/taskbar button. NotifyIcon exposes Status, Cameras, Restart and Exit.
+App creates no startup window/taskbar button. NotifyIcon exposes Status, Camera controls, Cameras, Restart and Exit.
 The shared console JSON is linked into WPF output/publish. UseControllerStub selects stub/physical DI.
 
 StatusViewModel.InitializeAsync is invoked automatically, once per process. It discovers the
@@ -133,8 +133,12 @@ About/Update, and prior physical-controller checks. The user has confirmed all s
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 31 connector/logger/stub and 59 WPF tests
-passed (90 total). Icon rendering smoke checks load the embedded SVG, render transparent 16/32 px
+Latest automated checks: build without warnings/errors; 39 connector/logger/stub and 61 WPF tests
+passed (100 total). Added capability checks distinguish unsupported driver responses from generic
+failures, validate manual support/ranges/current values without Set, publish all axes before required
+Zoom failure, update values after movement/at limits, remove failed current reads, and forward typed
+payloads from the worker to the UI without rescanning/restarting. Icon rendering smoke checks load
+the embedded SVG, render transparent 16/32 px
 icons and create/dispose native icon handles; status assertions cover healthy, initializing,
 unselected and error-priority states. The rendered preview was visually inspected; actual tray
 rendering across Windows themes/DPI remains a manual check.
@@ -179,6 +183,30 @@ Tooltips identify the state without relying only on color. Rendering tests expor
 TestResults/tray-icons-preview.png without starting the application or accessing devices.
 
 ## Hardware test status
+
+### Camera controls submenu
+
+The root Camera controls submenu (after Status) has Zoom/Pan/Tilt read-only rows. Supported axes
+show Current (min: Min, max: Max); unsupported axes show Not supported, failed probes show Error in red,
+and unchecked axes show Not checked. This follows the startup camera and does not rescan on opening.
+
+Connector.Models.CameraControlCapabilities carries per-axis manual support and nullable value/range
+snapshots. CameraControls queries all three axes via GetRange/Get without movement, reports the full
+snapshot, then rethrows any required Zoom failure. E_NOTIMPL, E_PROP_ID_UNSUPPORTED and
+E_PROP_SET_UNSUPPORTED, or no manual flag, are distinguished from unexpected HRESULT/range errors.
+No IAMCameraControl interface reports all axes unsupported before failing startup.
+
+A compatible manager Start overload reports immutable capability snapshots on the same worker.
+Existing Start overloads and console registration remain supported; other manager implementations
+may use the default interface fallback and leave capability state unchecked. BridgeSession forwards
+typed BridgeNotification payloads to StatusViewModel via its captured UI progress context, without
+parsing logger messages. Opening/initializing performs no Set and creates no video capture stream.
+
+After a successful command, CameraControls reads Get again and publishes actual current value,
+rather than assuming the requested Set value was applied. Limit attempts publish current without Set;
+failed Get/Set reports Error with no stale current value for that axis. There is no polling timer:
+external changes are reflected on the next command for that axis. These are driver reports;
+physical compatibility, directions and limits still require user verification.
 
 ### Integrated camera with keyboard controller stub
 

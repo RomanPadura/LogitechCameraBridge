@@ -22,7 +22,8 @@ public sealed class BridgeSession(ICameraBridgeManager manager, UiCameraBridgeLo
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 // Discovery, camera calls, HID disposal and COM release stay on this thread.
-                manager.Start(cancellationToken, () => progress.Report(new(true)));
+                manager.Start(cancellationToken, () => progress.Report(new(true)),
+                    capabilities => progress.Report(new(false, Capabilities: capabilities)));
             }
             catch (Exception ex)
             {
