@@ -32,7 +32,7 @@ dotnet run --project src/LogitechCameraBridge.Wpf
 ```
 
 The app uses .NET 10 WPF, MVVM, DI and the shared console appSettings.json. It has no startup
-window or taskbar button. Its tray menu contains Status, Camera controls, Cameras, Restart and Exit.
+window or taskbar button. Its tray menu contains Status, Camera controls, Cameras, About, Restart and Exit.
 
 Startup performs one attempt:
 
@@ -51,7 +51,7 @@ false and the worker is cancelled. Check logger.txt and restart the application.
 shows the startup device list and current session status; it does not retry discovery or initialization.
 
 Select a camera in Cameras to save Name/DevicePath in
-`%LocalAppData%\LogitechCameraBridge\userSettings.json`. After a successful save, the application
+`%LocalAppData%\LogitechCameraBridgeData\userSettings.json`. After a successful save, the application
 automatically restarts and initializes the chosen camera. A failed save does not restart the app.
 Use Restart (directly above Exit) to restart manually, including after a device or control error.
 Preferences survive builds and remain separate from shared appSettings.json. Unknown JSON settings
@@ -129,7 +129,10 @@ and dotnet-hosted launches, without opening a console window. The original dotne
 return to its terminal while the replacement continues running in the tray. Relaunch failures are
 logged and the old instance exits; launch the app manually if that happens.
 Startup configuration failures leave Restart and Exit available.
-About and Update remain future steps.
+About contains a read-only Version row and Check for updates. Version comes from the WPF assembly's
+AssemblyVersion and uses exactly three components (major.minor.build). Check for updates checks
+GitHub Releases and silently installs a newer stable Velopack package, then restarts the app.
+The tag-based release workflow injects the package version into the application at build time.
 
 Manual check:
 
@@ -206,3 +209,8 @@ from the repository's **Actions** tab. Each test run uploads TRX results as the 
 See [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) for implementation details and test status.
 
 DirectShow API reference: [IAMCameraControl](https://learn.microsoft.com/en-us/windows/win32/api/strmif/nn-strmif-iamcameracontrol).
+## Application updates
+
+The tray app supports Velopack updates from GitHub Releases through **About > Check
+for updates...**. See [the step-by-step release and update guide](docs/UPDATES.md)
+for repository visibility, first installation, version tags and silent updates.

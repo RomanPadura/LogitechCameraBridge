@@ -18,6 +18,8 @@ public sealed class TrayIcon : IDisposable
     private readonly ToolStripMenuItem _camerasItem = new("Cameras");
     private readonly ToolStripMenuItem _statusItem = new("Status");
     private readonly ToolStripMenuItem _controlsItem = new("Camera controls");
+    private readonly ToolStripMenuItem _aboutItem = new("About");
+    private readonly ToolStripMenuItem _updateItem = new("Check for updates...");
     private readonly ToolStripLabel _zoomValue = new("Zoom: Not checked");
     private readonly ToolStripLabel _panValue = new("Pan: Not checked");
     private readonly ToolStripLabel _tiltValue = new("Tilt: Not checked");
@@ -31,8 +33,9 @@ public sealed class TrayIcon : IDisposable
 
     public event EventHandler? ExitRequested;
     public event EventHandler? RestartRequested;
+    public event EventHandler? UpdateRequested;
 
-    public TrayIcon()
+    public TrayIcon(AboutViewModel about)
     {
         _exitItem.Click += OnExitClick;
         _restartItem.Click += OnRestartClick;
@@ -42,6 +45,10 @@ public sealed class TrayIcon : IDisposable
         _menu.Items.Add(_controlsItem);
         _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Cameras unavailable") { Enabled = false });
         _menu.Items.Add(_camerasItem);
+        _aboutItem.DropDownItems.Add(new ToolStripLabel($"Version: {about.Version}"));
+        _updateItem.Click += OnUpdateClick;
+        _aboutItem.DropDownItems.Add(_updateItem);
+        _menu.Items.Add(_aboutItem);
         _menu.Items.Add(_restartItem);
         _menu.Items.Add(_exitItem);
         _notifyIcon = new NotifyIcon
@@ -129,6 +136,7 @@ public sealed class TrayIcon : IDisposable
         _camerasItem.Enabled = false;
         _statusItem.Enabled = false;
         _controlsItem.Enabled = false;
+        _aboutItem.Enabled = false;
     }
 
     private void OnCameraMenuChanged(object? sender, PropertyChangedEventArgs e) => RenderCameras();
@@ -204,6 +212,17 @@ public sealed class TrayIcon : IDisposable
 
     public void ShowError(string message) => _notifyIcon.ShowBalloonTip(5000, "Camera bridge", message, ToolTipIcon.Error);
 
+    public void SetUpdating(bool updating)
+    {
+        _updateItem.Enabled = !updating;
+        _updateItem.Text = updating ? "Checking / downloading update..." : "Check for updates...";
+    }
+
+    public void ShowUpdateMessage(string message) =>
+        _notifyIcon.ShowBalloonTip(5000, "Application updates", message, ToolTipIcon.Info);
+
+    private void OnUpdateClick(object? sender, EventArgs e) => UpdateRequested?.Invoke(this, EventArgs.Empty);
+
     private void OnExitClick(object? sender, EventArgs e) => ExitRequested?.Invoke(this, EventArgs.Empty);
     private void OnRestartClick(object? sender, EventArgs e) => RestartRequested?.Invoke(this, EventArgs.Empty);
 
@@ -221,6 +240,7 @@ public sealed class TrayIcon : IDisposable
             _status.PropertyChanged -= OnStatusChanged;
         _exitItem.Click -= OnExitClick;
         _restartItem.Click -= OnRestartClick;
+        _updateItem.Click -= OnUpdateClick;
         _menu.Dispose();
         foreach (var icon in _icons.Values)
             icon.Dispose();

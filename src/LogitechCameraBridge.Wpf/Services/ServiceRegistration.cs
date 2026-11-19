@@ -40,7 +40,7 @@ public static class ServiceRegistration
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<ICameraSelectionStore>(_ => new JsonCameraSelectionStore(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "LogitechCameraBridge", "userSettings.json")));
+            "LogitechCameraBridgeData", "userSettings.json")));
         services.AddSingleton<CameraMenuViewModel>();
         services.AddSingleton<StatusViewModel>();
         return services;

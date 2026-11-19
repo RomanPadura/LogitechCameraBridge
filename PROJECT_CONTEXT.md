@@ -19,7 +19,7 @@ SimulatorKeyResult and TrayIconState. Connector.Models contains ControllerConfig
 ControlRange, CameraControlSupport, CameraControlValue and CameraControlCapabilities.
 Cameras.Models contains CameraDeviceInfo. Services/managers/ViewModels reference these models.
 ViewModel classes remain in the owning project's ViewModels folder and namespace; WPF currently
-has MainViewModel, CameraMenuViewModel and StatusViewModel there. ViewModels are not data models.
+has MainViewModel, CameraMenuViewModel, StatusViewModel and AboutViewModel there. ViewModels are not data models.
 Configuration types retain Common.Options; native ABI structs remain local interop implementation
 details, and test fixtures/fakes remain with their tests. This organization change preserves behavior.
 
@@ -133,18 +133,19 @@ on BridgeSession's dedicated MTA worker. Exit awaits startup/session and pending
 flushes logger writes, removes the hook/icon and disposes services.
 
 JsonCameraSelectionStore persists Name/DevicePath under SelectedCamera in
-`%LocalAppData%\LogitechCameraBridge\userSettings.json`. Unknown keys are preserved, invalid JSON
+`%LocalAppData%\LogitechCameraBridgeData\userSettings.json`. Unknown keys are preserved, invalid JSON
 is not overwritten, and replacement follows a complete temporary-file write. Camera enumeration
 returns managed identity snapshots and releases native resources on its enumeration thread.
 The console retains its independent synchronous lifecycle and USB selection by default.
 
 Pending: visual/hardware acceptance of restart/exit, exact image directions and range limits,
-About/Update, and prior physical-controller checks. The user has confirmed all six keyboard-stub
+end-to-end acceptance of published Velopack updates, and prior physical-controller checks. The user has confirmed all six keyboard-stub
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 39 connector/logger/stub and 61 WPF tests
-passed (100 total). Added capability checks distinguish unsupported driver responses from generic
+Latest automated checks: build without warnings/errors; 39 connector/logger/stub and 66 WPF tests
+passed (105 total). Self-contained win-x64 publish and Velopack installer/feed packaging also pass.
+Added capability checks distinguish unsupported driver responses from generic
 failures, validate manual support/ranges/current values without Set, publish all axes before required
 Zoom failure, update values after movement/at limits, remove failed current reads, and forward typed
 payloads from the worker to the UI without rescanning/restarting. Icon rendering smoke checks load
@@ -193,6 +194,26 @@ Tooltips identify the state without relying only on color. Rendering tests expor
 TestResults/tray-icons-preview.png without starting the application or accessing devices.
 
 ## Hardware test status
+
+### About submenu
+
+About appears before Restart/Exit and contains Version: major.minor.build plus Check for updates.
+AboutViewModel in ViewModels reads typeof(MainViewModel).Assembly.GetName().Version.ToString(3).
+The model is constructed with the tray shell so About also works when JSON startup fails.
+Version is not hardcoded in menu code; the tag-based release workflow sets Version at build time.
+Check for updates now invokes AppUpdater, using Velopack 1.2.161 and GithubSource for
+RomanPadura/LogitechCameraBridge (stable releases only). Checks occur only on user request;
+Velopack automatic application of staged updates at startup is disabled. Downloads finish
+before bridge cleanup; shutdown releases devices and flushes logs before launching
+WaitExitThenApplyUpdates(silent: true, restart: true). Exit/restart cancels an in-flight download
+and prevents the completed check from applying an update. Repeated update clicks are disabled.
+A custom STA Main runs the Velopack bootstrap before WPF initializes. Public releases need no
+client credentials; optional private access uses LOGITECH_CAMERA_BRIDGE_GITHUB_TOKEN from the
+process/user environment. Tokens and request exceptions are not logged.
+The release workflow builds/tests on v* pushes, publishes self-contained win-x64 output,
+downloads the previous stable package for deltas, packs and uploads with the built-in GitHub
+token. Prerelease tags create prereleases ignored by the client. See docs/UPDATES.md.
+AppUpdaterTests cover no-install/no-update, downloading, download failure and cancellation.
 
 ### Camera controls submenu
 
