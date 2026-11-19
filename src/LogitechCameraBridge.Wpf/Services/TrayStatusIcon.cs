@@ -1,3 +1,4 @@
+using LogitechCameraBridge.Wpf.Models;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -6,8 +7,6 @@ using System.Xml.Linq;
 using Media = System.Windows.Media;
 
 namespace LogitechCameraBridge.Wpf.Services;
-
-public enum TrayIconState { Initializing, Healthy, Error, CameraNotSelected }
 
 /// <summary>Renders the licensed camera glyph inside a high-contrast status ring.</summary>
 public static class TrayStatusIcon

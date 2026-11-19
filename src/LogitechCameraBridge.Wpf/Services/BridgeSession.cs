@@ -1,3 +1,4 @@
+using LogitechCameraBridge.Wpf.Models;
 using LogitechCameraBridge.Connector.Interfaces;
 
 namespace LogitechCameraBridge.Wpf.Services;

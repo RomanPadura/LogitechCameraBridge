@@ -1,6 +1,6 @@
-namespace LogitechCameraBridge.Wpf.Services;
+using LogitechCameraBridge.Wpf.Models;
 
-public sealed record BridgeActivitySnapshot(string? DevicePath, bool IsReady, string? Error);
+namespace LogitechCameraBridge.Wpf.Services;
 
 /// <summary>A thread-safe snapshot of observed bridge readiness, not a requested run mode.</summary>
 public sealed class BridgeActivity

@@ -1,3 +1,4 @@
+using LogitechCameraBridge.Wpf.Models;
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Windows;

@@ -1,6 +1,6 @@
-namespace LogitechCameraBridge.Wpf.Services;
+using LogitechCameraBridge.Wpf.Models;
 
-public readonly record struct SimulatorKeyResult(bool Suppress, SimulatorButton? Button = null);
+namespace LogitechCameraBridge.Wpf.Services;
 
 /// <summary>Tracks only simulator keys and conflicting modifiers; never records typed text.</summary>
 public sealed class SimulatorKeyChords

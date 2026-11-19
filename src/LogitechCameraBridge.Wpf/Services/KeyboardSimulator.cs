@@ -1,3 +1,4 @@
+using LogitechCameraBridge.Wpf.Models;
 using System.Globalization;
 using System.IO;
 using LogitechCameraBridge.Common.Options;
@@ -5,8 +6,6 @@ using LogitechCameraBridge.Controllers;
 using Microsoft.Extensions.Options;
 
 namespace LogitechCameraBridge.Wpf.Services;
-
-public enum SimulatorButton { ZoomIn, ZoomOut, Left, Right, Up, Down }
 
 /// <summary>Submits input only to the bridge already initialized at application startup.</summary>
 public sealed class KeyboardSimulator(

@@ -1,3 +1,4 @@
+using LogitechCameraBridge.Wpf.Models;
 using System.Windows.Threading;
 using LogitechCameraBridge.Logger.Interfaces;
 using LogitechCameraBridge.Wpf.Services;

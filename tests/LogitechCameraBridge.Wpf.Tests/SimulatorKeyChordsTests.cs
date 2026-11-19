@@ -1,3 +1,4 @@
+using LogitechCameraBridge.Wpf.Models;
 using LogitechCameraBridge.Wpf.Services;
 
 namespace LogitechCameraBridge.Wpf.Tests;

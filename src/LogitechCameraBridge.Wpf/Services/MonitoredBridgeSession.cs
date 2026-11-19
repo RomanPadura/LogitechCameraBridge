@@ -1,3 +1,4 @@
+using LogitechCameraBridge.Wpf.Models;
 using LogitechCameraBridge.Common.Options;
 using Microsoft.Extensions.Options;
 

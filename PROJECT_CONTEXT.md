@@ -13,6 +13,16 @@
 
 ## Current structure
 
+Data models are kept in each owning project's Models folder and namespace, one type per file.
+Wpf.Models contains DeviceStatus, BridgeNotification, BridgeActivitySnapshot, SimulatorButton,
+SimulatorKeyResult and TrayIconState. Connector.Models contains ControllerConfiguration,
+ControlRange, CameraControlSupport, CameraControlValue and CameraControlCapabilities.
+Cameras.Models contains CameraDeviceInfo. Services/managers/ViewModels reference these models.
+ViewModel classes remain in the owning project's ViewModels folder and namespace; WPF currently
+has MainViewModel, CameraMenuViewModel and StatusViewModel there. ViewModels are not data models.
+Configuration types retain Common.Options; native ABI structs remain local interop implementation
+details, and test fixtures/fakes remain with their tests. This organization change preserves behavior.
+
 - Common: options shared across projects.
 - Logger: `ICameraBridgeLogger`, controlled by `Logger.LogToConsole` through `IOptions<LoggerOptions>`.
 - Controllers: `IControllerDiscovery`, physical HID discovery and an idle `ControllerDiscoveryStub` implementation.

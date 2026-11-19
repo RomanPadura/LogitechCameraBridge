@@ -1,3 +1,4 @@
+using LogitechCameraBridge.Wpf.Models;
 using System.Globalization;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -10,8 +11,6 @@ using LogitechCameraBridge.Wpf.Services;
 using Microsoft.Extensions.Options;
 
 namespace LogitechCameraBridge.Wpf.ViewModels;
-
-public sealed record DeviceStatus(string Text, bool IsError);
 
 /// <summary>One startup attempt; failures require restarting the application.</summary>
 public partial class StatusViewModel(

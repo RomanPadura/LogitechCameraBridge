@@ -1,9 +1,5 @@
 namespace LogitechCameraBridge.Connector.Models;
 
-public enum CameraControlSupport { NotChecked, Supported, NotSupported, Error }
-
-public sealed record CameraControlValue(int Current, int Min, int Max);
-
 /// <summary>Manual-control support reported by the driver, without issuing movement commands.</summary>
 public sealed record CameraControlCapabilities(
     CameraControlSupport Zoom, CameraControlSupport Pan, CameraControlSupport Tilt,

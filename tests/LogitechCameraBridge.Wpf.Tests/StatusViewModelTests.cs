@@ -1,3 +1,4 @@
+using LogitechCameraBridge.Wpf.Models;
 using HidSharp;
 using LogitechCameraBridge.Cameras.Interfaces;
 using LogitechCameraBridge.Cameras.Models;

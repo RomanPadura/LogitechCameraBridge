@@ -128,6 +128,4 @@ internal sealed class CameraControls(IAMCameraControl camera, ICameraBridgeLogge
         if (result < 0)
             throw new COMException($"{property} {operation} failed (HRESULT=0x{result:X8}).", result);
     }
-
-    private sealed record ControlRange(int Min, int Max, int Step);
 }
