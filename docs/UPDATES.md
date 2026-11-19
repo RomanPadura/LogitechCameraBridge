@@ -58,16 +58,24 @@ Open **Actions > Package release with Velopack** and wait for success. The workf
 
 Do not manually create the release first. A rerun uses `--merge` for the same tag.
 The first Velopack release needs no previous package. Keep the package ID
-`RomanPadura.LogitechCameraBridge` and the default `win` channel unchanged in future
+`LogitechCameraBridge` and the default `win` channel unchanged in future
 releases. All packages are explicitly built for `win-x64`.
 
 ## 4. Install once on each machine
 
 Open the repository's **Releases** page and download
-`RomanPadura.LogitechCameraBridge-win-Setup.exe` from `v1.0.0`.
+`LogitechCameraBridge-win-Setup.exe` from `v1.0.0`.
 Exit any old manually copied version, run Setup.exe, and start the installed app.
 Running the executable from `bin/Release` or a `dotnet publish` directory does not
 provide the installed Velopack layout needed for updates.
+
+The app installs under `%LOCALAPPDATA%\LogitechCameraBridge`; user settings are
+stored separately under `%LOCALAPPDATA%\LogitechCameraBridgeData`.
+If you already installed a package with the former ID `RomanPadura.LogitechCameraBridge`,
+uninstall it and install the new Setup.exe: changing the package ID creates a different
+Velopack application. Before switching, exit the app and copy any existing
+`%LOCALAPPDATA%\LogitechCameraBridge\userSettings.json` to
+`%LOCALAPPDATA%\LogitechCameraBridgeData\userSettings.json` to retain camera selection.
 
 The installer is currently unsigned. Signing can be added to the packaging command
 when you have a code-signing certificate; Windows may show a trust prompt for the
@@ -102,7 +110,7 @@ it as a GitHub prerelease; the tray updater ignores prereleases.
 5. Check that the selected camera is retained and the controller reconnects.
 6. Check again: the app should report that it is already current.
 
-Camera selection remains in `%LOCALAPPDATA%\LogitechCameraBridge\userSettings.json`,
+Camera selection remains in `%LOCALAPPDATA%\LogitechCameraBridgeData\userSettings.json`,
 outside versioned application files. The packaged `appSettings.json` is replaced
 by each release; manual changes inside the install directory are not persistent.
 

@@ -51,7 +51,7 @@ false and the worker is cancelled. Check logger.txt and restart the application.
 shows the startup device list and current session status; it does not retry discovery or initialization.
 
 Select a camera in Cameras to save Name/DevicePath in
-`%LocalAppData%\LogitechCameraBridge\userSettings.json`. After a successful save, the application
+`%LocalAppData%\LogitechCameraBridgeData\userSettings.json`. After a successful save, the application
 automatically restarts and initializes the chosen camera. A failed save does not restart the app.
 Use Restart (directly above Exit) to restart manually, including after a device or control error.
 Preferences survive builds and remain separate from shared appSettings.json. Unknown JSON settings

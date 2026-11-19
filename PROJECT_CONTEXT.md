@@ -133,7 +133,7 @@ on BridgeSession's dedicated MTA worker. Exit awaits startup/session and pending
 flushes logger writes, removes the hook/icon and disposes services.
 
 JsonCameraSelectionStore persists Name/DevicePath under SelectedCamera in
-`%LocalAppData%\LogitechCameraBridge\userSettings.json`. Unknown keys are preserved, invalid JSON
+`%LocalAppData%\LogitechCameraBridgeData\userSettings.json`. Unknown keys are preserved, invalid JSON
 is not overwritten, and replacement follows a complete temporary-file write. Camera enumeration
 returns managed identity snapshots and releases native resources on its enumeration thread.
 The console retains its independent synchronous lifecycle and USB selection by default.
