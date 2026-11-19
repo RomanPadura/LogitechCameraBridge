@@ -95,7 +95,7 @@ runtime errors to the ViewModel. The original JSON file is linked into the WPF o
 
 ## Tray application: one startup attempt
 
-App creates no startup window/taskbar button. NotifyIcon exposes Status, Cameras and Exit.
+App creates no startup window/taskbar button. NotifyIcon exposes Status, Cameras, Restart and Exit.
 The shared console JSON is linked into WPF output/publish. UseControllerStub selects stub/physical DI.
 
 StatusViewModel.InitializeAsync is invoked automatically, once per process. It discovers the
@@ -107,7 +107,7 @@ button reports and performs no movement or video capture. It owns session cancel
 
 There is no lazy keyboard startup, retry, reconnection, live switching or menu-triggered rescan.
 Repeated initialization calls return the same startup task. Camera selection only saves a choice
-for the next launch, with a restart notification. The running camera/status stays the startup choice.
+and requests an application restart after a successful save. Failed saves never request restart.
 CameraMenuViewModel latches scan/save failures. Initialization/runtime faults make Active false,
 retain Error, cancel the worker and require restart. App blocks keys unless Active.
 
@@ -132,12 +132,31 @@ Pending: visual/hardware acceptance of automatic startup/exit and keyboard behav
 and prior physical control checks. The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 31 connector/logger/stub and 52 WPF tests
-passed (83 total). Tests now cover automatic startup without keys, a single initialization attempt,
+Latest automated checks: build without warnings/errors; 31 connector/logger/stub and 58 WPF tests
+passed (89 total). Restart tests verify apphost/dotnet launch arguments, replacement of the previous
+parent handshake, argument preservation, invalid/self-parent rejection and the normal no-wait path.
+They do not launch a replacement app or establish actual process handoff/visual/hardware acceptance.
+Tests also cover automatic startup without keys, a single initialization attempt,
 unavailable selection, missing controller, next-start selection persistence, restart-only failures,
 inactive keyboard suppression and shutdown cancellation. Existing simulated camera, HID stub,
 thread cleanup, DI, JSON and key-chord checks pass. Hardware/visual acceptance remains unverified.
 Build/test required execution outside sandbox restrictions.
+
+### Explicit application restart
+
+TrayIcon exposes RestartRequested for the Restart item (directly above Exit) and after successful
+camera selection/save. Both use App's common shutdown path. An is-exiting guard ignores overlapping
+Exit/Restart requests. Menus and input are disabled, startup/session and settings writes are awaited,
+and logs are flushed before spawning a replacement. The child receives --restart-parent <PID>
+and waits for the old process to exit before creating the tray icon or initializing devices.
+This prevents old/new HID/COM sessions from overlapping and handles apphost and dotnet DLL launches.
+ArgumentList preserves arguments with spaces; old parent arguments are replaced, not accumulated.
+No shell or console window is launched. Failed cleanup/relaunch is logged and the old instance exits.
+Configuration failures still leave the tray Restart and Exit actions available.
+
+README describes camera control capabilities without naming a camera model; the current control
+implementation still requires manual Zoom and treats Pan/Tilt as optional. Hardware history here
+retains actual device identities. No new hardware acceptance is implied by the README wording.
 
 ## Hardware test status
 

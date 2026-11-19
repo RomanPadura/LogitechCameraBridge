@@ -25,9 +25,19 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
+        // A replacement instance must not initialize devices before the previous process exits.
+        try { await AppRestart.WaitForParentAsync(e.Args); }
+        catch (Exception ex)
+        {
+            Trace.TraceError(ex.ToString());
+            Shutdown(1);
+            return;
+        }
+
         // No Window is created: the application lives only in the notification area.
         _trayIcon = new TrayIcon();
         _trayIcon.ExitRequested += OnExitRequested;
+        _trayIcon.RestartRequested += OnRestartRequested;
 
         try
         {
@@ -87,7 +97,11 @@ public partial class App : System.Windows.Application
             _status?.Fail(new InvalidOperationException(_cameraMenu.Error));
     }
 
-    private async void OnExitRequested(object? sender, EventArgs e)
+    private async void OnExitRequested(object? sender, EventArgs e) => await ShutdownApplicationAsync(restart: false);
+
+    private async void OnRestartRequested(object? sender, EventArgs e) => await ShutdownApplicationAsync(restart: true);
+
+    private async Task ShutdownApplicationAsync(bool restart)
     {
         if (_isExiting)
             return;
@@ -105,13 +119,21 @@ public partial class App : System.Windows.Application
                 await _cameraMenu.ShutdownAsync();
             if (_logger is not null)
             {
-                _logger.LogInfo("Tray application stopped.");
+                _logger.LogInfo(restart ? "Tray application restarting." : "Tray application stopped.");
                 await _logger.FlushAsync();
             }
+            // Cleanup and settings writes have completed. The child waits for this process to exit.
+            if (restart)
+                AppRestart.StartReplacement();
         }
         catch (Exception ex)
         {
             Trace.TraceError(ex.ToString());
+            if (_logger is not null)
+            {
+                _logger.LogError(ex.ToString());
+                await _logger.FlushAsync();
+            }
             exitCode = 1;
         }
         finally
@@ -128,6 +150,7 @@ public partial class App : System.Windows.Application
         if (_trayIcon is not null)
         {
             _trayIcon.ExitRequested -= OnExitRequested;
+            _trayIcon.RestartRequested -= OnRestartRequested;
             _trayIcon.Dispose();
         }
         _services?.Dispose();

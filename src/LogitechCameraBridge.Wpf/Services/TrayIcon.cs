@@ -10,6 +10,7 @@ public sealed class TrayIcon : IDisposable
     private readonly Icon _icon = (Icon)SystemIcons.Application.Clone();
     private readonly ContextMenuStrip _menu = new();
     private readonly ToolStripMenuItem _exitItem = new("Exit");
+    private readonly ToolStripMenuItem _restartItem = new("Restart");
     private readonly ToolStripMenuItem _camerasItem = new("Cameras");
     private readonly ToolStripMenuItem _statusItem = new("Status");
     private readonly ToolStripLabel _controllerStatus = new("Logitech Controller: Checking...");
@@ -21,14 +22,17 @@ public sealed class TrayIcon : IDisposable
     private bool _isDisposed;
 
     public event EventHandler? ExitRequested;
+    public event EventHandler? RestartRequested;
 
     public TrayIcon()
     {
         _exitItem.Click += OnExitClick;
+        _restartItem.Click += OnRestartClick;
         _statusItem.DropDownItems.AddRange([_controllerStatus, _cameraStatus, _activeStatus]);
         _menu.Items.Add(_statusItem);
         _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Cameras unavailable") { Enabled = false });
         _menu.Items.Add(_camerasItem);
+        _menu.Items.Add(_restartItem);
         _menu.Items.Add(_exitItem);
         _notifyIcon = new NotifyIcon
         {
@@ -74,6 +78,7 @@ public sealed class TrayIcon : IDisposable
     public void DisableExit()
     {
         _exitItem.Enabled = false;
+        _restartItem.Enabled = false;
         _camerasItem.Enabled = false;
         _statusItem.Enabled = false;
     }
@@ -115,13 +120,14 @@ public sealed class TrayIcon : IDisposable
                 };
                 item.Click += async (_, _) =>
                 {
+                    if (_isDisposed || !_cameraMenu.SelectCommand.CanExecute(camera))
+                        return;
                     await _cameraMenu.SelectCommand.ExecuteAsync(camera);
                     // The menu closes on click; make a failed save visible immediately.
                     if (!_isDisposed && !string.IsNullOrEmpty(_cameraMenu.Error))
                         _notifyIcon.ShowBalloonTip(5000, "Camera selection", _cameraMenu.Error, ToolTipIcon.Error);
                     else if (!_isDisposed)
-                        _notifyIcon.ShowBalloonTip(5000, "Camera selection",
-                            "Camera saved. Restart the application to use this selection.", ToolTipIcon.Info);
+                        RestartRequested?.Invoke(this, EventArgs.Empty);
                 };
                 _camerasItem.DropDownItems.Add(item);
             }
@@ -150,6 +156,7 @@ public sealed class TrayIcon : IDisposable
     public void ShowError(string message) => _notifyIcon.ShowBalloonTip(5000, "Camera bridge", message, ToolTipIcon.Error);
 
     private void OnExitClick(object? sender, EventArgs e) => ExitRequested?.Invoke(this, EventArgs.Empty);
+    private void OnRestartClick(object? sender, EventArgs e) => RestartRequested?.Invoke(this, EventArgs.Empty);
 
     public void Dispose()
     {
@@ -164,6 +171,7 @@ public sealed class TrayIcon : IDisposable
         if (_status is not null)
             _status.PropertyChanged -= OnStatusChanged;
         _exitItem.Click -= OnExitClick;
+        _restartItem.Click -= OnRestartClick;
         _menu.Dispose();
         _icon.Dispose();
     }
