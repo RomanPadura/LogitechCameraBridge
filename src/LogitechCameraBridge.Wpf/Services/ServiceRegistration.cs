@@ -20,7 +20,8 @@ public static class ServiceRegistration
     {
         services.Configure<LoggerOptions>(configuration.GetRequiredSection(LoggerOptions.SectionName));
         services.Configure<BridgeControllerDeviceOptions>(configuration.GetRequiredSection(BridgeControllerDeviceOptions.SectionName));
-        services.Configure<CameraToControlOptions>(configuration.GetRequiredSection(CameraToControlOptions.SectionName));
+        // Populated from the camera selected in the tray; no USB camera configuration is needed.
+        services.AddOptions<CameraToControlOptions>();
         services.AddSingleton<CameraBridgeLogger>();
         services.AddSingleton<UiCameraBridgeLogger>();
         services.AddSingleton<ICameraBridgeLogger>(provider => provider.GetRequiredService<UiCameraBridgeLogger>());

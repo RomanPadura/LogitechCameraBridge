@@ -21,8 +21,14 @@ services.Configure<LoggerOptions>(
     configuration.GetRequiredSection(LoggerOptions.SectionName));
 services.Configure<BridgeControllerDeviceOptions>(
     configuration.GetRequiredSection(BridgeControllerDeviceOptions.SectionName));
-services.Configure<CameraToControlOptions>(
-    configuration.GetRequiredSection(CameraToControlOptions.SectionName));
+// USB selection is a console-only default. The tray host uses its saved camera path.
+services.Configure<CameraToControlOptions>(options =>
+{
+    options.Vid = "0x046D";
+    options.Pid = "0x0843";
+    options.UsbInterface = "MI_00";
+    options.UsbInterfacePrefix = "MI_";
+});
 services.AddSingleton<ICameraBridgeLogger, CameraBridgeLogger>();
 if (configuration.GetValue<bool>("UseControllerStub"))
     services.AddSingleton<IControllerDiscovery, ControllerDiscoveryStub>();

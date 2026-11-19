@@ -79,6 +79,12 @@ binding without USB identity assumptions or fallback. The manager bypasses USB c
 the path is supplied; console USB selection is preserved otherwise. COM binding/release stays on the
 bridge worker. Missing selection/camera and unsupported camera controls are reported, not simulated.
 
+Camera USB identity values now live only in the console Program.cs options registration
+(VID 0x046D, PID 0x0843, interface MI_00 with prefix MI_). The shared appSettings.json
+has no CameraToControl section. WPF registers empty CameraToControlOptions and fills
+DevicePath from its saved menu selection; it does not bind USB defaults from JSON.
+The unused Device display-name option was removed.
+
 ## Pan/Tilt implementation
 
 Button codes are configured in `BridgeControllerDevice`; all six codes must be distinct bytes excluding 0x00/0xFF.

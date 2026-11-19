@@ -16,6 +16,11 @@ All button codes are hexadecimal strings in `BridgeControllerDevice`.
 Set `Logger.LogToConsole` to `true` to see discovery, ranges, reports, and errors.
 Restart the app after configuration changes.
 
+Camera USB selection is defined only in the console's `Program.cs` (Logitech C930e:
+VID `0x046D`, PID `0x0843`, interface `MI_00`). Change those console defaults there
+when using another USB camera. The shared JSON has no `CameraToControl` section;
+the tray app uses the camera selected through its menu.
+
 `UseControllerStub` is a root-level JSON option, currently set to `true`. Both hosts register
 `ControllerDiscoveryStub` as `IControllerDiscovery` when enabled; `false` or a missing option
 registers the physical `ControllerDiscovery`. Set it to `false` before testing GROUP buttons.
