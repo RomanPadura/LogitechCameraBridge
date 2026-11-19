@@ -21,7 +21,7 @@
 - Console app: JSON configuration, DI registrations, Ctrl+C handling.
 - Connector.Tests: simulated camera-control tests; no physical hardware access.
 - Wpf: .NET 10 Windows tray executable with CommunityToolkit.Mvvm, DI/options, a dedicated
-  MTA worker and MainViewModel. The tray shell exposes Cameras/Exit and does not start the bridge.
+  MTA worker and MainViewModel. The tray shell exposes Cameras/Exit; keyboard simulation starts the bridge on demand.
 - Wpf.Tests: worker cancellation/cleanup, overlap protection, failure/retry, and ViewModel
   readiness/error/shutdown and camera-menu tests on a WPF dispatcher, plus JSON persistence tests; no hardware access.
 
@@ -38,11 +38,38 @@ false/missing. Restart after changing it. The stub is a class implementing the e
 there is no separate stub interface and the manager's discovery contract is unchanged.
 
 The stub returns an in-memory HidDevice with the requested identity and a clearly simulated path/name.
-Opening it returns an idle HidStream: reads wait for ReadTimeout then throw TimeoutException,
+Opening it returns an in-memory HidStream: idle reads wait for ReadTimeout then throw TimeoutException,
 so the existing bridge loop retains cancellation behavior. Disposal wakes a pending read and the
 device can be opened again. No native HID access or descriptor reconstruction is performed.
-Synthetic button presses and a simulator UI are outside this step. Camera operations remain real,
-and the WPF tray still does not start the bridge automatically. Physical button tests require false.
+`TryPressButton(reportId, buttonCode)` queues a 13-byte report for open streams. Each stream has
+a bounded 32-report queue, discarded on disposal. Nothing is queued without an open stream.
+Camera operations remain real. Physical button tests require false.
+
+### Keyboard simulator
+
+WPF stub DI registers the same ControllerDiscoveryStub singleton for discovery and keyboard input.
+`SimulatorHotkeys` uses WH_KEYBOARD_LL, with a rooted callback, only in WPF stub mode.
+Hold Z and press main +/= or numpad + to zoom in, Z with main/numpad - to zoom out;
+hold P with arrows for Pan/Tilt. Shifted main + is supported. These use Windows virtual key codes.
+The callback tracks only relevant key states, ignores injected events, and posts commands to the
+WPF dispatcher instead of doing camera/file work inside the hook. No typed text is logged.
+`SimulatorKeyChords` suppresses recognized action keys, their repeats and matching releases;
+Z/P themselves and ordinary keys pass through to the foreground application. Both prefixes held
+or Ctrl/Alt/Windows modifiers prevent movement. Repeats never generate another command.
+Prefix state is reconciled before action events to avoid stale state after missed releases.
+No window/taskbar button is created. Hook installation errors surface through the tray; Exit removes
+the hook before cancelling the worker. Real hook/foreground keyboard behavior still requires manual verification.
+
+`KeyboardSimulator` loads the saved selection on each command. It starts the bridge lazily, waits for
+the readiness callback, and submits the configured report ID/button code. Concurrent commands while
+starting/switching are dropped. A changed identity cancels/awaits the old worker before updating the
+shared options and starting again. Shutdown cancels startup and waits for cleanup; background failures
+are observed/logged. No movement occurs at app startup or merely on camera selection.
+
+`CameraToControlOptions.DevicePath` and an exact-path discovery overload allow selected-camera
+binding without USB identity assumptions or fallback. The manager bypasses USB configuration when
+the path is supplied; console USB selection is preserved otherwise. COM binding/release stays on the
+bridge worker. Missing selection/camera and unsupported camera controls are reported, not simulated.
 
 ## Pan/Tilt implementation
 
@@ -81,7 +108,7 @@ flush, calls WPF Shutdown, and disposes the icon/menu/icon resource, DI provider
 Configuration failures leave the tray shell available with a startup-failed tooltip and Exit.
 
 The original console JSON remains the single source file, linked into WPF output/publish.
-The tray shell deliberately does not start the bridge. It enumerates cameras when Cameras is opened,
+The tray shell starts the stub bridge only on a keyboard command. It enumerates cameras when Cameras is opened,
 without opening camera filters or starting capture.
 
 ### Camera selection
@@ -104,7 +131,7 @@ separate from the linked shared appSettings.json. Reads/writes are serialized, u
 are preserved, and replacement follows a complete temporary-file write in the same directory.
 Malformed settings are reported and never silently overwritten. Save failures keep the previous
 selection and request a tray error notification; detailed failures go to the logger.
-The saved identity is loaded when the menu opens; bridge startup does not consume it yet.
+The saved identity is loaded when the menu opens and on keyboard commands for exact camera binding.
 
 Planned separate steps (the user will verify and commit each step):
 
@@ -121,8 +148,13 @@ About/Update, and hardware lifecycle verification.
 Computer Use inventory did not expose the Windows taskbar/notification area as a targetable window,
 so the tray icon/menu/Exit behavior could not be visually verified in this session.
 
-Latest automated verification: solution build succeeded with zero warnings/errors; 28 connector/logger/stub
-tests and 19 WPF tests passed (47 total). Tests cover controller-stub identity, idle reads, stream
+Latest automated verification: solution build succeeded with zero warnings/errors; 31 connector/logger/stub
+tests and 44 WPF tests passed (75 total). Chord tests cover all action keys, no-repeat behavior,
+prefix release ordering, unrelated keys, conflicting modifiers, action-before-prefix and missed prefix release.
+Other checks cover all six keyboard command reports,
+readiness gating, selection switching/cleanup, cancellation during startup, absent selection,
+stub report layout/queue disposal, exact selected-device routing and console USB routing.
+Tests also cover controller-stub identity, idle reads, stream
 disposal/reopening and true/false/missing-option DI registration, plus background scanning, selection timing,
 scan/save failure recovery, shutdown waiting, persistence across store instances, duplicate names,
 malformed settings, preservation of unrelated settings, and failed replacement without data loss.

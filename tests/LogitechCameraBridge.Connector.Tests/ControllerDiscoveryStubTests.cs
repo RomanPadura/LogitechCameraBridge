@@ -7,6 +7,28 @@ namespace LogitechCameraBridge.Connector.Tests;
 public class ControllerDiscoveryStubTests
 {
     [Fact]
+    public void SubmittedButtonUsesRealReportLayoutAndDoesNotSurviveReopen()
+    {
+        var stub = new ControllerDiscoveryStub(new SilentLogger());
+        Assert.False(stub.TryPressButton(0x0A, 0x10));
+        var device = stub.FindController(1, 2, 3);
+        using (var stream = device.Open())
+        {
+            Assert.True(stub.TryPressButton(0x0A, 0x10));
+            byte[] report = stream.Read();
+            Assert.Equal(13, report.Length);
+            Assert.Equal(0x0A, report[0]);
+            Assert.Equal(0x10, report[1]);
+            Assert.All(report.Skip(2), value => Assert.Equal(0, value));
+            Assert.True(stub.TryPressButton(0x0A, 0x20));
+        }
+        Assert.False(stub.TryPressButton(0x0A, 0x10));
+        using var reopened = device.Open();
+        reopened.ReadTimeout = 1;
+        Assert.Throws<TimeoutException>(() => reopened.Read());
+    }
+
+    [Fact]
     public void DiscoveryReturnsSimulatedDeviceWithRequestedIdentity()
     {
         var discovery = new ControllerDiscoveryStub(new SilentLogger());

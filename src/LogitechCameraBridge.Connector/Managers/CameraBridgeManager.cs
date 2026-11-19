@@ -41,7 +41,31 @@ public class CameraBridgeManager(
 
         var controller = ReadControllerConfiguration();
 
-        // Read camera configuration.
+        cancellationToken.ThrowIfCancellationRequested();
+        var speakerphone = _controllerDiscovery.FindController(
+            controller.Vid, controller.Pid, controller.FullUsage);
+        cancellationToken.ThrowIfCancellationRequested();
+        var filter = CreateCameraFilter();
+        try
+        {
+            if (filter is not IAMCameraControl camera)
+                throw new NotSupportedException("The selected camera does not support IAMCameraControl.");
+            ProcessReports(speakerphone, camera, controller.ReportId, controller.ButtonMappings,
+                cancellationToken, onReady);
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(filter);
+        }
+        _logger.LogInfo("Camera bridge stopped.");
+    }
+
+    private object CreateCameraFilter()
+    {
+        if (!string.IsNullOrWhiteSpace(_cameraOptions.DevicePath))
+            return _cameraDiscovery.CreateCameraFilter(_cameraOptions.DevicePath);
+
+        // Preserve USB configuration selection for the console host.
         int cameraVid = ConfigurationHelper.ReadHexValue(
             _cameraOptions.Vid,
             nameof(CameraToControlOptions.Vid),
@@ -57,40 +81,11 @@ public class CameraBridgeManager(
 
         ConfigurationHelper.ValidateUsbInterface(usbInterface, _cameraOptions.UsbInterfacePrefix);
 
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Find the HID controller.
-        var speakerphone = _controllerDiscovery.FindController(
-            controller.Vid, controller.Pid, controller.FullUsage);
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Find and initialize the camera filter.
-        var filter = _cameraDiscovery.CreateCameraFilter(
+        return _cameraDiscovery.CreateCameraFilter(
             cameraVid,
             cameraPid,
             usbInterface);
 
-        try
-        {
-            if (filter is not IAMCameraControl camera)
-                throw new NotSupportedException(
-                    "The selected camera does not support IAMCameraControl.");
-
-            ProcessReports(
-                speakerphone,
-                camera,
-                controller.ReportId,
-                controller.ButtonMappings,
-                cancellationToken,
-                onReady);
-        }
-        finally
-        {
-            Marshal.ReleaseComObject(filter);
-        }
-
-        _logger.LogInfo("Camera bridge stopped.");
     }
 
     private ControllerConfiguration ReadControllerConfiguration()

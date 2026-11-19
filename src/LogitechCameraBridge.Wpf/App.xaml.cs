@@ -17,6 +17,8 @@ public partial class App : System.Windows.Application
     private CameraMenuViewModel? _cameraMenu;
     private CameraBridgeLogger? _logger;
     private bool _isExiting;
+    private SimulatorHotkeys? _hotkeys;
+    private KeyboardSimulator? _simulator;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -39,7 +41,13 @@ public partial class App : System.Windows.Application
             _viewModel = _services.GetRequiredService<MainViewModel>();
             _cameraMenu = _services.GetRequiredService<CameraMenuViewModel>();
             _trayIcon.ConfigureCameras(_cameraMenu);
-            _logger.LogInfo("Tray application started. Bridge startup is not enabled in this step.");
+            if (_configuration.GetValue<bool>("UseControllerStub"))
+            {
+                _simulator = _services.GetRequiredService<KeyboardSimulator>();
+                _hotkeys = new SimulatorHotkeys();
+                _hotkeys.Pressed += OnSimulatorKey;
+            }
+            _logger.LogInfo("Tray application started. Stub keyboard commands open the saved camera on demand.");
         }
         catch (Exception ex)
         {
@@ -47,6 +55,23 @@ public partial class App : System.Windows.Application
             Trace.TraceError(ex.ToString());
             _logger?.LogError(ex.ToString());
             _trayIcon.ShowStartupFailure();
+            _trayIcon.ShowError(ex.Message);
+        }
+    }
+
+    private async void OnSimulatorKey(SimulatorButton button)
+    {
+        if (_isExiting || _simulator is null)
+            return;
+        try
+        {
+            await _simulator.PressAsync(button);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex.ToString());
+            if (!_isExiting)
+                _trayIcon?.ShowError(ex.Message);
         }
     }
 
@@ -56,12 +81,16 @@ public partial class App : System.Windows.Application
             return;
 
         _isExiting = true;
+        _hotkeys?.Dispose();
+        _hotkeys = null;
         _trayIcon?.DisableExit();
         int exitCode = 0;
         try
         {
             if (_cameraMenu is not null)
                 await _cameraMenu.ShutdownAsync();
+            if (_simulator is not null)
+                await _simulator.ShutdownAsync();
             if (_viewModel is not null)
                 await _viewModel.ShutdownAsync();
             if (_logger is not null)
@@ -83,6 +112,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _hotkeys?.Dispose();
         if (_trayIcon is not null)
         {
             _trayIcon.ExitRequested -= OnExitRequested;

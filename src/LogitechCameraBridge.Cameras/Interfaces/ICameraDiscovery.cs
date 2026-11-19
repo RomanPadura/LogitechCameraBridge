@@ -15,4 +15,7 @@ public interface ICameraDiscovery
     /// The caller must release the returned COM object when finished.
     /// </summary>
     object CreateCameraFilter(int vid, int pid, string usbInterface);
+
+    /// <summary>Opens exactly the selected device; never falls back to another camera.</summary>
+    object CreateCameraFilter(string devicePath) => throw new NotSupportedException("Device path selection is unavailable.");
 }

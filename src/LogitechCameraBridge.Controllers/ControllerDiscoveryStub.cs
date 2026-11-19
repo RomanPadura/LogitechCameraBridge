@@ -4,16 +4,45 @@ using LogitechCameraBridge.Logger.Interfaces;
 
 namespace LogitechCameraBridge.Controllers;
 
-/// <summary>Simulates an available, idle controller without accessing physical HID devices.</summary>
+/// <summary>Simulates a controller using explicitly submitted button reports, without physical HID access.</summary>
 public sealed class ControllerDiscoveryStub(ICameraBridgeLogger logger) : IControllerDiscovery
 {
+    private readonly object _streamsGate = new();
+    private readonly HashSet<StubHidStream> _streams = [];
+
+    public bool TryPressButton(byte reportId, byte buttonCode)
+    {
+        byte[] report = new byte[13];
+        report[0] = reportId;
+        report[1] = buttonCode;
+        lock (_streamsGate)
+        {
+            bool accepted = false;
+            foreach (var stream in _streams)
+                accepted |= stream.TryEnqueue(report);
+            return accepted;
+        }
+    }
+
+    private StubHidStream OpenStream(HidDevice device)
+    {
+        var stream = new StubHidStream(device, closed =>
+        {
+            lock (_streamsGate)
+                _streams.Remove(closed);
+        });
+        lock (_streamsGate)
+            _streams.Add(stream);
+        return stream;
+    }
+
     public HidDevice FindController(int vid, int pid, uint fullUsage)
     {
         logger.LogInfo($"Using controller stub. VID=0x{vid:X4}, PID=0x{pid:X4}, Usage=0x{fullUsage:X8}.");
-        return new StubHidDevice(vid, pid, fullUsage);
+        return new StubHidDevice(vid, pid, fullUsage, OpenStream);
     }
 
-    private sealed class StubHidDevice(int vid, int pid, uint fullUsage) : HidDevice
+    private sealed class StubHidDevice(int vid, int pid, uint fullUsage, Func<HidDevice, StubHidStream> open) : HidDevice
     {
         public override int VendorID => vid;
         public override int ProductID => pid;
@@ -30,15 +59,28 @@ public sealed class ControllerDiscoveryStub(ICameraBridgeLogger logger) : IContr
             => OpenDeviceDirectly(openConfig);
 
         protected override DeviceStream OpenDeviceDirectly(OpenConfiguration openConfig)
-            => new StubHidStream(this);
+            => open(this);
     }
 
-    private sealed class StubHidStream(HidDevice device) : HidStream(device)
+    private sealed class StubHidStream(HidDevice device, Action<StubHidStream> closed) : HidStream(device)
     {
         private readonly object _gate = new();
         private bool _disposed;
         private int _readTimeout;
         private int _writeTimeout;
+        private readonly Queue<byte[]> _reports = new();
+
+        public bool TryEnqueue(byte[] report)
+        {
+            lock (_gate)
+            {
+                if (_disposed || _reports.Count >= 32)
+                    return false;
+                _reports.Enqueue(report);
+                Monitor.PulseAll(_gate);
+                return true;
+            }
+        }
 
         public override int ReadTimeout
         {
@@ -66,11 +108,19 @@ public sealed class ControllerDiscoveryStub(ICameraBridgeLogger logger) : IContr
                 if (count == 0)
                     return 0;
 
-                // An idle controller generates no reports. Match the physical stream timeout
-                // so the existing bridge loop can check cancellation without busy-waiting.
-                Monitor.Wait(_gate, ReadTimeout);
+                if (count < 13)
+                    throw new ArgumentException("A complete 13-byte report buffer is required.");
+                long started = Environment.TickCount64;
+                while (_reports.Count == 0 && !_disposed)
+                {
+                    int remaining = ReadTimeout == Timeout.Infinite ? Timeout.Infinite
+                        : (int)Math.Max(0, ReadTimeout - (Environment.TickCount64 - started));
+                    if (remaining == 0 || !Monitor.Wait(_gate, remaining))
+                        throw new TimeoutException("The simulated controller has no input reports.");
+                }
                 ObjectDisposedException.ThrowIf(_disposed, this);
-                throw new TimeoutException("The simulated controller has no input reports.");
+                Array.Copy(_reports.Dequeue(), 0, buffer, offset, 13);
+                return 13;
             }
         }
 
@@ -85,8 +135,10 @@ public sealed class ControllerDiscoveryStub(ICameraBridgeLogger logger) : IContr
                 if (_disposed)
                     return;
                 _disposed = true;
+                _reports.Clear();
                 Monitor.PulseAll(_gate);
             }
+            closed(this);
             base.Dispose(disposing);
         }
 

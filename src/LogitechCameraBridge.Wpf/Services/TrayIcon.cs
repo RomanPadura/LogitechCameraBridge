@@ -113,6 +113,8 @@ public sealed class TrayIcon : IDisposable
 
     public void ShowStartupFailure() => _notifyIcon.Text = "LogitechCameraBridge - startup failed";
 
+    public void ShowError(string message) => _notifyIcon.ShowBalloonTip(5000, "Camera bridge", message, ToolTipIcon.Error);
+
     private void OnExitClick(object? sender, EventArgs e) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
     public void Dispose()
