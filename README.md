@@ -138,8 +138,23 @@ There is no application-generated button hold/repeat behavior yet.
 
 ## Hardware verification
 
-Zoom In/Out, camera control during an active Zoom conference, and normal volume/microphone operation
-have been confirmed by the user. Pan/Tilt hardware support and direction are not yet confirmed.
+The user confirmed all six commands (Zoom In/Out, Pan Left/Right, Tilt Up/Down) with the keyboard
+controller stub and the integrated camera on a Lenovo Legion 7 16IAX10 on 2026-11-19.
+The supplied initialization log reports manual control for all three axes:
+
+| Property | Min | Max | Step | Default |
+| --- | --- | --- | --- | --- |
+| Zoom | 100 | 400 | 10 | 100 |
+| Pan | -16 | 16 | 1 | 0 |
+| Tilt | -16 | 16 | 1 | 0 |
+
+One Zoom press therefore changes the value by 10 on this camera. Other drivers may report different steps.
+This confirms the keyboard-stub-to-real-camera path; it does not establish physical-controller
+Pan/Tilt acceptance, range-limit behavior, or compatibility with other cameras.
+
+Earlier user tests confirmed Zoom control during an active Zoom conference and normal
+volume/microphone operation with the physical controller. Exact image directions, boundary cases,
+and Pan/Tilt behavior during a conference remain separate checks.
 
 1. Start the app with logging enabled and inspect the Pan/Tilt capability output.
 2. Increase zoom within the camera's reported range and observe a separately opened camera preview.

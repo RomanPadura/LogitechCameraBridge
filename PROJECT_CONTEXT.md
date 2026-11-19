@@ -128,8 +128,9 @@ is not overwritten, and replacement follows a complete temporary-file write. Cam
 returns managed identity snapshots and releases native resources on its enumeration thread.
 The console retains its independent synchronous lifecycle and USB selection by default.
 
-Pending: visual/hardware acceptance of automatic startup/exit and keyboard behavior, About/Update,
-and prior physical control checks. The earlier Computer Use inventory did not expose a targetable
+Pending: visual/hardware acceptance of restart/exit, exact image directions and range limits,
+About/Update, and prior physical-controller checks. The user has confirmed all six keyboard-stub
+commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
 Latest automated checks: build without warnings/errors; 31 connector/logger/stub and 59 WPF tests
@@ -143,7 +144,8 @@ They do not launch a replacement app or establish actual process handoff/visual/
 Tests also cover automatic startup without keys, a single initialization attempt,
 unavailable selection, missing controller, next-start selection persistence, restart-only failures,
 inactive keyboard suppression and shutdown cancellation. Existing simulated camera, HID stub,
-thread cleanup, DI, JSON and key-chord checks pass. Hardware/visual acceptance remains unverified.
+thread cleanup, DI, JSON and key-chord checks pass. These automated tests establish no hardware
+acceptance; user-confirmed hardware results are recorded separately below.
 Build/test required execution outside sandbox restrictions.
 
 ### Explicit application restart
@@ -178,6 +180,27 @@ TestResults/tray-icons-preview.png without starting the application or accessing
 
 ## Hardware test status
 
+### Integrated camera with keyboard controller stub
+
+On 2026-11-19, the user confirmed all six controls working on the Lenovo Legion 7 16IAX10
+integrated camera using the WPF keyboard stub: Zoom In/Out, Pan Left/Right and Tilt Up/Down.
+The controller is simulated; the camera and IAMCameraControl calls are real.
+
+Supplied initialization log:
+
+- Device name: Integrated Camera; VID 0x04F2, PID 0xB83D, interface MI_00.
+- Zoom: Min 100, Max 400, Step 10, Default/initial Current 100, Manual.
+- Pan: Min -16, Max 16, Step 1, Default/initial Current 0, Manual.
+- Tilt: Min -16, Max 16, Step 1, Default/initial Current 0, Manual.
+- The bridge reached Listening for controller buttons with Report ID 0x0A and all six mappings.
+
+The excerpt establishes discovery/capabilities/readiness; functional success of the six commands
+is the user's explicit observation. Do not infer that limits, exact image directions, mirrored
+previews, physical GROUP input, conference behavior or restart/icon behavior were tested on this camera.
+Driver-step movement is intentional: this camera's Zoom step is 10, unlike the earlier camera's step 1.
+
+### Earlier physical GROUP and C930e tests
+
 Confirmed by the user:
 
 - GROUP camera-control collection and C930e are detected.
@@ -186,7 +209,7 @@ Confirmed by the user:
 - Control works during an active Zoom conference.
 - Volume and microphone buttons retain their normal operation.
 
-Pending:
+Pending for this physical-controller/camera combination:
 
 - Pan/Tilt support, reported ranges, visible movement, and correct directions.
 - Pan/Tilt behavior at different zoom levels and during an active conference.
