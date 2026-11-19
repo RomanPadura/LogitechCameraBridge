@@ -132,8 +132,12 @@ Pending: visual/hardware acceptance of automatic startup/exit and keyboard behav
 and prior physical control checks. The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 31 connector/logger/stub and 58 WPF tests
-passed (89 total). Restart tests verify apphost/dotnet launch arguments, replacement of the previous
+Latest automated checks: build without warnings/errors; 31 connector/logger/stub and 59 WPF tests
+passed (90 total). Icon rendering smoke checks load the embedded SVG, render transparent 16/32 px
+icons and create/dispose native icon handles; status assertions cover healthy, initializing,
+unselected and error-priority states. The rendered preview was visually inspected; actual tray
+rendering across Windows themes/DPI remains a manual check.
+Restart tests verify apphost/dotnet launch arguments, replacement of the previous
 parent handshake, argument preservation, invalid/self-parent rejection and the normal no-wait path.
 They do not launch a replacement app or establish actual process handoff/visual/hardware acceptance.
 Tests also cover automatic startup without keys, a single initialization attempt,
@@ -157,6 +161,20 @@ Configuration failures still leave the tray Restart and Exit actions available.
 README describes camera control capabilities without naming a camera model; the current control
 implementation still requires manual Zoom and treats Pan/Tilt as optional. Hardware history here
 retains actual device identities. No new hardware acceptance is implied by the README wording.
+
+### Status tray icon
+
+The Microsoft Fluent camera_24_filled SVG is embedded as FluentCamera.svg; its MIT license and
+source attribution are under Assets. The license is copied into output/publish. TrayStatusIcon
+renders the frozen path with a light disk and colored ring at the current system small-icon size.
+Temporary HICONs are destroyed after cloning; four owned icon variants are cached for the tray
+lifetime, switched only when the state changes, and disposed after NotifyIcon disposal.
+Green means confirmed readiness; red means error; orange means only the camera selection is
+unavailable while the controller was found. Errors take priority. Gray is reserved for initialization.
+StatusViewModel exposes typed TrayState with property notifications rather than deriving colors
+from display strings; camera selection absence is tracked separately from generic camera errors.
+Tooltips identify the state without relying only on color. Rendering tests export a preview to
+TestResults/tray-icons-preview.png without starting the application or accessing devices.
 
 ## Hardware test status
 

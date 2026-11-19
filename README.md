@@ -69,6 +69,18 @@ Missing devices, no selection, errors and Active: false are red. Status updates 
 and observed worker events without menu-triggered rescans. A found camera alone does not establish
 readiness. Errors remain until restart. Unsupported optional axes during initialization do not block Zoom.
 
+The tray icon uses a Microsoft Fluent camera glyph inside a status circle:
+
+- Green: the bridge is ready and Active is true.
+- Red: a controller/device/initialization/runtime error, or an otherwise inactive completed startup.
+- Orange: the controller is found and the only issue is no available saved camera selection.
+- Gray: initialization is still in progress; readiness has not been confirmed.
+
+Errors take priority over orange. The tooltip also names the state. The icon has a light background
+and transparent outer corners for contrast on light/dark taskbars. The glyph and its MIT license
+are included under `src/LogitechCameraBridge.Wpf/Assets`; the license is copied to build/publish output.
+Source: [Microsoft Fluent System Icons](https://github.com/microsoft/fluentui-system-icons).
+
 ### Keyboard simulator
 
 With UseControllerStub: true, commands work only after startup reports Active: true:

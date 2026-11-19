@@ -23,11 +23,26 @@ public partial class StatusViewModel(
     ICameraBridgeLogger logger) : ObservableObject
 {
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TrayState))]
     private DeviceStatus _controller = new("Checking...", false);
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TrayState))]
     private DeviceStatus _camera = new("Checking...", false);
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TrayState))]
     private bool _active;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TrayState))]
+    private bool _isInitializing = true;
+
+    private bool _cameraNotSelected;
+
+    public TrayIconState TrayState => _failed || Controller.IsError || (Camera.IsError && !_cameraNotSelected)
+        ? TrayIconState.Error
+        : IsInitializing ? TrayIconState.Initializing
+        : _cameraNotSelected ? TrayIconState.CameraNotSelected
+        : Active ? TrayIconState.Healthy : TrayIconState.Error;
 
     private readonly CancellationTokenSource _stop = new();
     private Task _startup = Task.CompletedTask;
@@ -42,8 +57,14 @@ public partial class StatusViewModel(
         if (_initialized || _closing)
             return _startup;
         _initialized = true;
-        _startup = InitializeCoreAsync();
+        _startup = InitializeAndSettleAsync();
         return _startup;
+    }
+
+    private async Task InitializeAndSettleAsync()
+    {
+        try { await InitializeCoreAsync(); }
+        finally { IsInitializing = false; }
     }
 
     private async Task InitializeCoreAsync()
@@ -90,6 +111,7 @@ public partial class StatusViewModel(
             camera.DevicePath, selected.DevicePath, StringComparison.OrdinalIgnoreCase));
         if (found is null)
         {
+            _cameraNotSelected = true;
             Camera = new("Not selected", true);
             return;
         }

@@ -17,10 +17,12 @@ public class StatusViewModelTests
     public Task StartupRunsWithoutKeyboardInputAndDoesNotRetry() => MainViewModelTests.OnDispatcherAsync(async () =>
     {
         var f = new Fixture();
+        Assert.Equal(TrayIconState.Initializing, f.Model.TrayState);
         await f.Model.InitializeAsync();
         Assert.Equal(new DeviceStatus("Stub", false), f.Model.Controller);
         Assert.Equal(new DeviceStatus("Camera", false), f.Model.Camera);
         Assert.True(f.Model.Active);
+        Assert.Equal(TrayIconState.Healthy, f.Model.TrayState);
         Assert.Equal("device-1", f.Options.Value.DevicePath);
         await f.Model.InitializeAsync();
         Assert.Equal(1, f.Session.Starts);
@@ -40,6 +42,7 @@ public class StatusViewModelTests
         else f.Store.Camera = null;
         await f.Model.InitializeAsync();
         Assert.Equal(new DeviceStatus("Not selected", true), f.Model.Camera);
+        Assert.Equal(TrayIconState.CameraNotSelected, f.Model.TrayState);
         Assert.False(f.Model.Active);
         Assert.Equal(0, f.Session.Starts);
         await f.Model.ShutdownAsync();
@@ -49,8 +52,10 @@ public class StatusViewModelTests
     public Task MissingControllerStillListsCameras() => MainViewModelTests.OnDispatcherAsync(async () =>
     {
         var f = new Fixture(new MissingController());
+        f.Store.Camera = null; // Missing controller takes priority over the orange no-selection state.
         await f.Model.InitializeAsync();
         Assert.Equal(new DeviceStatus("Not found", true), f.Model.Controller);
+        Assert.Equal(TrayIconState.Error, f.Model.TrayState);
         Assert.Single(f.Menu.Cameras);
         Assert.False(f.Model.Active);
         Assert.Equal(0, f.Session.Starts);
@@ -79,6 +84,7 @@ public class StatusViewModelTests
         f.Session.StartFailure = new InvalidOperationException("Camera failed");
         await f.Model.InitializeAsync();
         Assert.Equal(new DeviceStatus("Error", true), f.Model.Camera);
+        Assert.Equal(TrayIconState.Error, f.Model.TrayState);
         Assert.False(f.Model.Active);
         await f.Model.InitializeAsync();
         Assert.Equal(1, f.Session.Starts);

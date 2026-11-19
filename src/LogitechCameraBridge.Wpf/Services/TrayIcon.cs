@@ -7,7 +7,9 @@ namespace LogitechCameraBridge.Wpf.Services;
 
 public sealed class TrayIcon : IDisposable
 {
-    private readonly Icon _icon = (Icon)SystemIcons.Application.Clone();
+    private readonly Dictionary<TrayIconState, Icon> _icons = Enum.GetValues<TrayIconState>()
+        .ToDictionary(state => state, state => TrayStatusIcon.Create(state, SystemInformation.SmallIconSize.Width));
+    private TrayIconState _iconState = TrayIconState.Initializing;
     private readonly ContextMenuStrip _menu = new();
     private readonly ToolStripMenuItem _exitItem = new("Exit");
     private readonly ToolStripMenuItem _restartItem = new("Restart");
@@ -36,8 +38,8 @@ public sealed class TrayIcon : IDisposable
         _menu.Items.Add(_exitItem);
         _notifyIcon = new NotifyIcon
         {
-            Icon = _icon,
-            Text = "LogitechCameraBridge",
+            Icon = _icons[_iconState],
+            Text = "LogitechCameraBridge - starting",
             ContextMenuStrip = _menu,
             Visible = true
         };
@@ -64,6 +66,23 @@ public sealed class TrayIcon : IDisposable
         _cameraStatus.ForeColor = _status.Camera.IsError ? Color.Red : SystemColors.MenuText;
         _activeStatus.Text = _status.Active ? "Active: true" : "Active: false";
         _activeStatus.ForeColor = _status.Active ? SystemColors.MenuText : Color.Red;
+        SetIconState(_status.TrayState);
+    }
+
+    private void SetIconState(TrayIconState state)
+    {
+        if (_iconState != state)
+        {
+            _iconState = state;
+            _notifyIcon.Icon = _icons[state];
+        }
+        _notifyIcon.Text = state switch
+        {
+            TrayIconState.Healthy => "LogitechCameraBridge - active",
+            TrayIconState.CameraNotSelected => "LogitechCameraBridge - camera not selected",
+            TrayIconState.Error => "LogitechCameraBridge - error; check logs",
+            _ => "LogitechCameraBridge - starting"
+        };
     }
 
     public void ConfigureCameras(CameraMenuViewModel cameraMenu)
@@ -146,6 +165,7 @@ public sealed class TrayIcon : IDisposable
 
     public void ShowStartupFailure()
     {
+        SetIconState(TrayIconState.Error);
         _notifyIcon.Text = "LogitechCameraBridge - startup failed";
         _controllerStatus.Text = "Logitech Controller: Error";
         _cameraStatus.Text = "Camera: Error";
@@ -173,6 +193,7 @@ public sealed class TrayIcon : IDisposable
         _exitItem.Click -= OnExitClick;
         _restartItem.Click -= OnRestartClick;
         _menu.Dispose();
-        _icon.Dispose();
+        foreach (var icon in _icons.Values)
+            icon.Dispose();
     }
 }
