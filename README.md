@@ -15,6 +15,13 @@ All button codes are hexadecimal strings in `BridgeControllerDevice`.
 Set `Logger.LogToConsole` to `true` to see discovery, ranges, reports, and errors.
 Restart the app after configuration changes.
 
+`UseControllerStub` is a root-level JSON option, currently set to `true`. Both hosts register
+`ControllerDiscoveryStub` as `IControllerDiscovery` when enabled; `false` or a missing option
+registers the physical `ControllerDiscovery`. Set it to `false` before testing GROUP buttons.
+The stub simulates an available, idle controller without accessing HID hardware or generating
+button presses. Its input reads time out so the existing cancellation loop can stop normally.
+Camera discovery/control is still real; this option does not simulate a camera or enable WPF bridge startup.
+
 ## WPF tray app
 
 `src/LogitechCameraBridge.Wpf` targets `net10.0-windows` and uses CommunityToolkit.Mvvm,

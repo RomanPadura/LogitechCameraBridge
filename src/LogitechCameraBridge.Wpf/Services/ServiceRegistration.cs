@@ -24,7 +24,10 @@ public static class ServiceRegistration
         services.AddSingleton<CameraBridgeLogger>();
         services.AddSingleton<UiCameraBridgeLogger>();
         services.AddSingleton<ICameraBridgeLogger>(provider => provider.GetRequiredService<UiCameraBridgeLogger>());
-        services.AddSingleton<IControllerDiscovery, ControllerDiscovery>();
+        if (configuration.GetValue<bool>("UseControllerStub"))
+            services.AddSingleton<IControllerDiscovery, ControllerDiscoveryStub>();
+        else
+            services.AddSingleton<IControllerDiscovery, ControllerDiscovery>();
         services.AddSingleton<ICameraDiscovery, CameraDiscovery>();
         services.AddSingleton<ICameraBridgeManager, CameraBridgeManager>();
         services.AddSingleton<IBridgeSession, BridgeSession>();

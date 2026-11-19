@@ -24,7 +24,10 @@ services.Configure<BridgeControllerDeviceOptions>(
 services.Configure<CameraToControlOptions>(
     configuration.GetRequiredSection(CameraToControlOptions.SectionName));
 services.AddSingleton<ICameraBridgeLogger, CameraBridgeLogger>();
-services.AddSingleton<IControllerDiscovery, ControllerDiscovery>();
+if (configuration.GetValue<bool>("UseControllerStub"))
+    services.AddSingleton<IControllerDiscovery, ControllerDiscoveryStub>();
+else
+    services.AddSingleton<IControllerDiscovery, ControllerDiscovery>();
 services.AddSingleton<ICameraDiscovery, CameraDiscovery>();
 services.AddSingleton<ICameraBridgeManager, CameraBridgeManager>();
 

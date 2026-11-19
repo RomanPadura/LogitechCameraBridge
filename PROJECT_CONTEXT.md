@@ -15,7 +15,7 @@
 
 - Common: options shared across projects.
 - Logger: `ICameraBridgeLogger`, controlled by `Logger.LogToConsole` through `IOptions<LoggerOptions>`.
-- Controllers: `IControllerDiscovery`, HID collection discovery and Windows HID capability queries.
+- Controllers: `IControllerDiscovery`, physical HID discovery and an idle `ControllerDiscoveryStub` implementation.
 - Cameras: `ICameraDiscovery`, DirectShow filter creation by VID/PID/interface and camera identity enumeration.
 - Connector: `ICameraBridgeManager`, HID command dispatch and camera control processing.
 - Console app: JSON configuration, DI registrations, Ctrl+C handling.
@@ -29,6 +29,20 @@ All projects target .NET 10. The bridge is Windows-only and does not start video
 The caller releases the COM filter returned by camera discovery. The HID stream is disposed when processing exits.
 HID discovery uses `HidD_GetPreparsedData` and `HidP_GetCaps`: HidSharp report descriptor reconstruction
 failed on the actual GROUP device and must not be reintroduced for discovery.
+
+## Controller simulation
+
+The shared JSON now has root-level `"UseControllerStub": true`. WPF and console DI register
+`IControllerDiscovery` with `ControllerDiscoveryStub` when true, or `ControllerDiscovery` when
+false/missing. Restart after changing it. The stub is a class implementing the existing interface;
+there is no separate stub interface and the manager's discovery contract is unchanged.
+
+The stub returns an in-memory HidDevice with the requested identity and a clearly simulated path/name.
+Opening it returns an idle HidStream: reads wait for ReadTimeout then throw TimeoutException,
+so the existing bridge loop retains cancellation behavior. Disposal wakes a pending read and the
+device can be opened again. No native HID access or descriptor reconstruction is performed.
+Synthetic button presses and a simulator UI are outside this step. Camera operations remain real,
+and the WPF tray still does not start the bridge automatically. Physical button tests require false.
 
 ## Pan/Tilt implementation
 
@@ -107,8 +121,9 @@ About/Update, and hardware lifecycle verification.
 Computer Use inventory did not expose the Windows taskbar/notification area as a targetable window,
 so the tray icon/menu/Exit behavior could not be visually verified in this session.
 
-Latest automated verification: solution build succeeded with zero warnings/errors; 24 connector/logger
-tests and 16 WPF tests passed (40 total). New tests cover background scanning, selection timing,
+Latest automated verification: solution build succeeded with zero warnings/errors; 28 connector/logger/stub
+tests and 19 WPF tests passed (47 total). Tests cover controller-stub identity, idle reads, stream
+disposal/reopening and true/false/missing-option DI registration, plus background scanning, selection timing,
 scan/save failure recovery, shutdown waiting, persistence across store instances, duplicate names,
 malformed settings, preservation of unrelated settings, and failed replacement without data loss.
 Build/test required execution outside sandbox restrictions. These tests do not establish hardware
