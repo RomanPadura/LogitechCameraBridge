@@ -42,6 +42,7 @@ window or taskbar button. Its tray menu contains Status, Camera controls, Camera
 The notification-area icon uses the Windows Shell API with a hidden message window;
 all menus use WPF controls. There is no WinForms dependency. The icon is restored
 automatically after Windows Explorer restarts, and removed when the app exits.
+Both left-click and right-click on the tray icon open the same menu; keyboard activation also works.
 
 Startup performs one attempt:
 

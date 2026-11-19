@@ -130,8 +130,10 @@ internal sealed class NotificationAreaIcon : INotificationAreaIcon
             else if (message == CallbackMessage)
             {
                 int notification = _version4 ? (int)(lParam.ToInt64() & 0xFFFF) : lParam.ToInt32();
-                // Version 4 sends WM_CONTEXTMENU for right click and NIN_KEYSELECT for keyboard activation.
-                if ((_version4 && notification is 0x007B or 0x0401) || (!_version4 && notification == 0x0205))
+                // Version 4: WM_CONTEXTMENU (right), NIN_SELECT (left), NIN_KEYSELECT (keyboard).
+                // Use NIN_SELECT instead of WM_LBUTTONUP to avoid opening twice for one click.
+                if ((_version4 && notification is 0x007B or 0x0400 or 0x0401)
+                    || (!_version4 && notification is 0x0202 or 0x0205))
                     MenuRequested?.Invoke(GetMenuPosition());
                 handled = true;
             }

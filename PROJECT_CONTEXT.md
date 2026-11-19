@@ -225,7 +225,8 @@ TestResults/tray-icons-preview.png without starting the application or accessing
 ### Native tray and WPF menus
 
 NotificationAreaIcon owns a hidden top-level HwndSource (not a message-only window),
-registers Shell_NotifyIcon version 4, routes context-menu/keyboard callbacks, and listens
+registers Shell_NotifyIcon version 4, routes right-click (WM_CONTEXTMENU), left-click
+(NIN_SELECT), and keyboard (NIN_KEYSELECT) callbacks to the same menu, and listens
 for TaskbarCreated to re-add the current icon after Explorer restarts. Failed registration
 retries on a dispatcher timer; Dispose stops retries, deletes the icon and destroys the HWND.
 Context menus use the icon rectangle for positioning, foreground activation before showing,

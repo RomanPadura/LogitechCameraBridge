@@ -66,6 +66,11 @@ public class NotificationAreaIconTests
         SendMessage(tray.WindowHandle, NotificationAreaIcon.CallbackMessage, (IntPtr)1, (IntPtr)(packedId | 0x0401));
         SendMessage(tray.WindowHandle, NotificationAreaIcon.CallbackMessage, (IntPtr)1, (IntPtr)(packedId | 0x0205));
         Assert.Equal(version4 ? 2 : 1, requested);
+        // A left-click sequence opens once: NIN_SELECT in v4, WM_LBUTTONUP in legacy mode.
+        SendMessage(tray.WindowHandle, NotificationAreaIcon.CallbackMessage, (IntPtr)1, (IntPtr)(packedId | 0x0201));
+        SendMessage(tray.WindowHandle, NotificationAreaIcon.CallbackMessage, (IntPtr)1, (IntPtr)(packedId | 0x0202));
+        SendMessage(tray.WindowHandle, NotificationAreaIcon.CallbackMessage, (IntPtr)1, (IntPtr)(packedId | 0x0400));
+        Assert.Equal(version4 ? 3 : 2, requested);
         tray.ReturnFocus();
         Assert.Equal(3u, shell.Calls[^1].Command);
         return Task.CompletedTask;
