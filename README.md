@@ -15,6 +15,21 @@ All button codes are hexadecimal strings in `BridgeControllerDevice`.
 Set `Logger.LogToConsole` to `true` to see discovery, ranges, reports, and errors.
 Restart the app after configuration changes.
 
+## WPF foundation (in progress)
+
+`src/LogitechCameraBridge.Wpf` targets `net10.0-windows` and uses CommunityToolkit.Mvvm,
+DI and options from the same linked `LogitechCameraBridgeConsole/appSettings.json`.
+The project currently builds as a library while the window design is being specified;
+there is no executable WPF window or WPF launch command yet.
+
+The foundation includes a dedicated MTA bridge worker, cancellation, overlapping-run protection,
+and a ViewModel with Start/Stop commands, readiness status and error reporting.
+Running status requires camera initialization and an open HID stream; it is not inferred from
+the requested start operation. It is a startup readiness signal, not continuous connection monitoring.
+Stop and `ShutdownAsync` wait for the worker to release device resources. Window-close integration
+and application startup/shutdown (including logger flush) remain to be connected with the window.
+Do not run the console host and the future WPF host simultaneously during hardware tests.
+
 | Button | Configuration | Default code | Action |
 | --- | --- | --- | --- |
 | Zoom In | ZoomInCode | 0x10 | Zoom +1 driver step |
@@ -55,7 +70,8 @@ Zoom Min/Max and clean Ctrl+C shutdown also remain pending hardware checks.
 dotnet test LogitechCameraBridgeSln.sln
 ```
 
-The tests use a simulated `IAMCameraControl`; they do not verify the physical hardware.
+The connector tests use a simulated `IAMCameraControl`; WPF lifecycle tests use simulated sessions
+and managers, including tests on a WPF dispatcher. They do not verify physical hardware or window layout.
 GitHub Actions builds the solution in Release mode and runs the unit tests on a Windows runner
 with .NET 10 for pushes to `main` and for every pull request. You can also start **Build and test** manually
 from the repository's **Actions** tab. Each test run uploads TRX results as the `test-results` artifact.

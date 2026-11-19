@@ -20,6 +20,10 @@
 - Connector: `ICameraBridgeManager`, HID command dispatch and camera control processing.
 - Console app: JSON configuration, DI registrations, Ctrl+C handling.
 - Connector.Tests: simulated camera-control tests; no physical hardware access.
+- Wpf: .NET 10 Windows library foundation with CommunityToolkit.Mvvm, DI/options, a dedicated
+  MTA worker and MainViewModel. Window appearance is awaiting user direction; no executable window yet.
+- Wpf.Tests: worker cancellation/cleanup, overlap protection, failure/retry, and ViewModel
+  readiness/error/shutdown tests on a WPF dispatcher; no hardware access.
 
 All projects target .NET 10. The bridge is Windows-only and does not start video capture.
 The caller releases the COM filter returned by camera discovery. The HID stream is disposed when processing exits.
@@ -35,7 +39,29 @@ On each supported button report, read the current property, add or subtract one 
 clamp to Min/Max, and call `Set` with `CameraControlFlags.Manual` if the value changes.
 Every control HRESULT is checked. Runtime command failures are logged and do not stop other controls.
 Right/Up initially increase values; Left/Down decrease them. Physical image directions are pending verification.
-No reset, hold/repeat, automatic zoom adjustment, reconnection, or WPF UI is implemented yet.
+No reset, hold/repeat, automatic zoom adjustment, reconnection, or WPF window is implemented yet.
+
+## WPF lifecycle foundation
+
+`ICameraBridgeManager.Start(CancellationToken)` remains available for the console host.
+The additional `Start(CancellationToken, Action onReady)` overload invokes the callback on the
+calling thread after camera initialization and HID opening, immediately before report processing.
+The callback is a startup readiness signal, not continuous device health monitoring.
+
+`BridgeSession` runs this synchronous API on a dedicated MTA thread. Discovery, controls and
+HID/COM cleanup stay on that worker. Its task completes after manager cleanup; cancellation
+never reports completion before cleanup. A second concurrent run is rejected.
+`MainViewModel` marshals progress to its captured UI synchronization context, ignores stale
+notifications, prevents overlapping starts, and waits for cancellation during Stop/ShutdownAsync.
+`UiCameraBridgeLogger` forwards logging to the existing options-controlled logger and exposes
+runtime errors to the ViewModel. The original JSON file is linked into the WPF output.
+
+Pending: executable App/window, window-close integration, configuration startup-error display,
+service disposal and logger flushing on exit, visual checks, and hardware lifecycle verification.
+The user is specifying the window design before that work continues.
+
+Latest automated verification: solution build succeeded with zero warnings/errors; 24 connector/logger
+tests and 6 WPF foundation tests passed. Build/test required execution outside sandbox restrictions.
 
 ## Hardware test status
 
