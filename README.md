@@ -34,7 +34,7 @@ dotnet run --project src/LogitechCameraBridge.Wpf
 
 The app creates no startup window or taskbar button. Find the standard application icon
 in the Windows notification area (possibly under **Show hidden icons**). Hover over it to
-identify `LogitechCameraBridge`, then right-click for **Cameras** and **Exit**.
+identify `LogitechCameraBridge`, then right-click for **Status**, **Cameras** and **Exit**.
 The app starts a stub bridge on the first simulator shortcut. Camera discovery lists Windows DirectShow video inputs
 without opening camera filters or starting video capture.
 Exit flushes queued logs, disposes services and removes the tray icon before the process ends.
@@ -84,7 +84,28 @@ The stub input queue is bounded and is cleared when the stream closes.
 These commands physically control the camera, without starting capture. Open a preview separately
 to observe movement; Zoom must be supported, and Pan/Tilt may be unavailable. Use short presses.
 Exit removes the keyboard hook, cancels the worker and waits for HID/COM cleanup. Errors go to logger.txt
-and command failures request a tray notification. Physical controller startup and Status remain future work.
+and command failures request a tray notification. Physical controller startup remains future work.
+
+### Status menu
+
+Opening **Status** refreshes three read-only rows asynchronously:
+
+| Row | Values |
+| --- | --- |
+| Controller | `found: Stub`, `found: Logitech`, `not found`, or `Error...check logs` |
+| Camera | `found: <name>`, `not selected`, `not found`, or `Error...check logs` |
+| Active | `true` or `false` |
+
+Missing devices, no selected camera, errors and `Active: false` are red. Checks only enumerate
+devices; opening Status does not start the bridge, bind a camera filter or move the camera.
+`Camera: found` confirms presence in the OS, not camera-control capabilities.
+`Active: true` additionally requires the bridge readiness callback for the currently selected camera,
+no reported runtime camera error, and successful controller/camera checks. Before the first simulator
+command, Active remains false even when both devices are found. A changed camera selection cannot
+inherit Active or an error from the previous camera's session. Initialization/terminal failures and
+runtime control errors show `Error...check logs`; unsupported optional axes logged before readiness
+do not block Zoom or force the ready camera into an error state. Check `logger.txt` for details.
+Status is a snapshot refreshed on opening, not continuous hotplug monitoring.
 
 The foundation includes a dedicated MTA bridge worker, cancellation, overlapping-run protection,
 and a ViewModel with Start/Stop commands, readiness status and error reporting.
@@ -103,8 +124,7 @@ Manual tray check:
 5. Disconnect the selected camera and reopen the menu: its saved identity should remain unavailable.
 6. Choose **Exit** and confirm that the icon disappears and `dotnet run` returns to the prompt.
 
-Subsequent steps will add bridge startup and a **Status** submenu with one current value
-(`Active`, `Controller not found`, `Camera not found`, or `Unknown error`), followed by **About** and **Update**.
+Subsequent steps will add physical-controller bridge startup, followed by **About** and **Update**.
 Each step is kept separate for user verification and a user-created commit.
 
 ## Controller commands

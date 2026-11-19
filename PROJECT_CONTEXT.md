@@ -21,7 +21,7 @@
 - Console app: JSON configuration, DI registrations, Ctrl+C handling.
 - Connector.Tests: simulated camera-control tests; no physical hardware access.
 - Wpf: .NET 10 Windows tray executable with CommunityToolkit.Mvvm, DI/options, a dedicated
-  MTA worker and MainViewModel. The tray shell exposes Cameras/Exit; keyboard simulation starts the bridge on demand.
+  MTA worker and MainViewModel. The tray shell exposes Status/Cameras/Exit; keyboard simulation starts the bridge on demand.
 - Wpf.Tests: worker cancellation/cleanup, overlap protection, failure/retry, and ViewModel
   readiness/error/shutdown and camera-menu tests on a WPF dispatcher, plus JSON persistence tests; no hardware access.
 
@@ -133,23 +133,52 @@ Malformed settings are reported and never silently overwritten. Save failures ke
 selection and request a tray error notification; detailed failures go to the logger.
 The saved identity is loaded when the menu opens and on keyboard commands for exact camera binding.
 
+### Status submenu
+
+`StatusViewModel.RefreshAsync` checks controller identity/discovery on a background thread, loads
+the saved camera identity and enumerates cameras asynchronously. It never opens a camera filter
+or controller stream or starts the bridge. Repeated concurrent refreshes share the pending task;
+shutdown waits for that task before service disposal.
+
+Controller displays found: Stub, found: Logitech, not found, or Error...check logs. The physical
+discovery now throws ControllerNotFoundException (derived from InvalidOperationException) for
+an absent device, allowing missing devices to be distinguished from other discovery/config errors.
+Camera displays found: <name>, not selected, not found, or Error...check logs. Errors are logged.
+Rows use read-only ToolStripLabels so error ForeColor remains red instead of disabled-item gray.
+Missing devices/no selection/errors and Active: false are red.
+
+`MonitoredBridgeSession` wraps the existing BridgeSession and publishes a thread-safe
+BridgeActivity snapshot keyed by camera path. It marks readiness only on the worker's callback,
+records terminal errors and runtime logger errors after readiness, and clears readiness when the
+run ends. It preserves progress forwarding and rejects overlapping runs without changing the
+existing session's state. Optional-axis initialization warnings before readiness do not block Zoom.
+
+Active is true only when both device checks succeed, the ready session targets the saved camera,
+and that session has no camera error. Merely starting or finding devices never implies Active.
+Changing selection cannot inherit readiness/errors from another device path. Found cameras are
+not necessarily compatible with IAMCameraControl. Status is refreshed when its submenu opens;
+it is not continuous hotplug monitoring. Runtime camera errors remain until the run stops/restarts.
+
 Planned separate steps (the user will verify and commit each step):
 
 1. Tray shell and Exit (implemented).
 2. Cameras submenu listing available cameras, selection, and JSON persistence across restarts (implemented).
-3. Bridge startup when the controller is found, using the previously selected camera, and Status
-   submenu with exactly one current status: Active, Controller not found,
-   Camera not found, or Unknown error. Confirm readiness instead of reporting a requested start as Active.
+3. Status submenu with Controller, Camera and Active rows (implemented).
+   Automatic physical-controller startup using the saved camera remains pending.
 4. About and Update (update behavior still needs to be specified).
 
 Pending: visual tray/Cameras/Exit verification, real OS camera enumeration and persistence acceptance,
-automatic bridge startup using the saved device identity, typed UI status classification,
+automatic physical-controller bridge startup using the saved device identity,
 About/Update, and hardware lifecycle verification.
 Computer Use inventory did not expose the Windows taskbar/notification area as a targetable window,
 so the tray icon/menu/Exit behavior could not be visually verified in this session.
 
 Latest automated verification: solution build succeeded with zero warnings/errors; 31 connector/logger/stub
-tests and 44 WPF tests passed (75 total). Chord tests cover all action keys, no-repeat behavior,
+tests and 57 WPF tests passed (88 total). Status tests cover found/missing/unselected/error states,
+readiness gating, previous-camera isolation, error recovery, configured controller identity,
+readiness clearing after stop/cancellation/failure, overlap protection, and shutdown waiting.
+These checks use simulated devices and do not verify the rendered menu colors or physical hardware.
+Chord tests cover all action keys, no-repeat behavior,
 prefix release ordering, unrelated keys, conflicting modifiers, action-before-prefix and missed prefix release.
 Other checks cover all six keyboard command reports,
 readiness gating, selection switching/cleanup, cancellation during startup, absent selection,

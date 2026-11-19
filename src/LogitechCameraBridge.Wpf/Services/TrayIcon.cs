@@ -11,8 +11,13 @@ public sealed class TrayIcon : IDisposable
     private readonly ContextMenuStrip _menu = new();
     private readonly ToolStripMenuItem _exitItem = new("Exit");
     private readonly ToolStripMenuItem _camerasItem = new("Cameras");
+    private readonly ToolStripMenuItem _statusItem = new("Status");
+    private readonly ToolStripLabel _controllerStatus = new("Controller: checking...");
+    private readonly ToolStripLabel _cameraStatus = new("Camera: checking...");
+    private readonly ToolStripLabel _activeStatus = new("Active: false");
     private readonly NotifyIcon _notifyIcon;
     private CameraMenuViewModel? _cameraMenu;
+    private StatusViewModel? _status;
     private bool _isDisposed;
 
     public event EventHandler? ExitRequested;
@@ -20,6 +25,9 @@ public sealed class TrayIcon : IDisposable
     public TrayIcon()
     {
         _exitItem.Click += OnExitClick;
+        _statusItem.DropDownOpening += OnStatusOpening;
+        _statusItem.DropDownItems.AddRange([_controllerStatus, _cameraStatus, _activeStatus]);
+        _menu.Items.Add(_statusItem);
         _camerasItem.DropDownOpening += OnCamerasOpening;
         _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Cameras unavailable") { Enabled = false });
         _menu.Items.Add(_camerasItem);
@@ -31,6 +39,35 @@ public sealed class TrayIcon : IDisposable
             ContextMenuStrip = _menu,
             Visible = true
         };
+    }
+
+    public void ConfigureStatus(StatusViewModel status)
+    {
+        if (_status is not null)
+            _status.PropertyChanged -= OnStatusChanged;
+        _status = status;
+        _status.PropertyChanged += OnStatusChanged;
+        RenderStatus();
+    }
+
+    private async void OnStatusOpening(object? sender, EventArgs e)
+    {
+        if (_status is not null)
+            await _status.RefreshAsync();
+    }
+
+    private void OnStatusChanged(object? sender, PropertyChangedEventArgs e) => RenderStatus();
+
+    private void RenderStatus()
+    {
+        if (_isDisposed || _status is null)
+            return;
+        _controllerStatus.Text = $"Controller: {_status.Controller.Text}";
+        _controllerStatus.ForeColor = _status.Controller.IsError ? Color.Red : SystemColors.MenuText;
+        _cameraStatus.Text = $"Camera: {_status.Camera.Text}";
+        _cameraStatus.ForeColor = _status.Camera.IsError ? Color.Red : SystemColors.MenuText;
+        _activeStatus.Text = _status.Active ? "Active: true" : "Active: false";
+        _activeStatus.ForeColor = _status.Active ? SystemColors.MenuText : Color.Red;
     }
 
     public void ConfigureCameras(CameraMenuViewModel cameraMenu)
@@ -46,6 +83,7 @@ public sealed class TrayIcon : IDisposable
     {
         _exitItem.Enabled = false;
         _camerasItem.Enabled = false;
+        _statusItem.Enabled = false;
     }
 
     private async void OnCamerasOpening(object? sender, EventArgs e)
@@ -111,7 +149,14 @@ public sealed class TrayIcon : IDisposable
             _camerasItem.DropDownItems.Add(new ToolStripMenuItem("No cameras found") { Enabled = false });
     }
 
-    public void ShowStartupFailure() => _notifyIcon.Text = "LogitechCameraBridge - startup failed";
+    public void ShowStartupFailure()
+    {
+        _notifyIcon.Text = "LogitechCameraBridge - startup failed";
+        _controllerStatus.Text = "Controller: Error...check logs";
+        _cameraStatus.Text = "Camera: Error...check logs";
+        _activeStatus.Text = "Active: false";
+        _controllerStatus.ForeColor = _cameraStatus.ForeColor = _activeStatus.ForeColor = Color.Red;
+    }
 
     public void ShowError(string message) => _notifyIcon.ShowBalloonTip(5000, "Camera bridge", message, ToolTipIcon.Error);
 
@@ -127,6 +172,9 @@ public sealed class TrayIcon : IDisposable
         _notifyIcon.Dispose();
         if (_cameraMenu is not null)
             _cameraMenu.PropertyChanged -= OnCameraMenuChanged;
+        if (_status is not null)
+            _status.PropertyChanged -= OnStatusChanged;
+        _statusItem.DropDownOpening -= OnStatusOpening;
         _camerasItem.DropDownOpening -= OnCamerasOpening;
         _exitItem.Click -= OnExitClick;
         _menu.Dispose();

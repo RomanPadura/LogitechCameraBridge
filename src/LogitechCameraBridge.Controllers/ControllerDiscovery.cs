@@ -50,7 +50,7 @@ public class ControllerDiscovery(ICameraBridgeLogger logger) : IControllerDiscov
             }
         }
 
-        throw new InvalidOperationException(
+        throw new ControllerNotFoundException(
             $"HID controller not found. VID=0x{vid:X4}, PID=0x{pid:X4}, Usage=0x{fullUsage:X8}.");
     }
 }

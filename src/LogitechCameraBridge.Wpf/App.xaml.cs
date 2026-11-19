@@ -19,6 +19,7 @@ public partial class App : System.Windows.Application
     private bool _isExiting;
     private SimulatorHotkeys? _hotkeys;
     private KeyboardSimulator? _simulator;
+    private StatusViewModel? _status;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -41,6 +42,8 @@ public partial class App : System.Windows.Application
             _viewModel = _services.GetRequiredService<MainViewModel>();
             _cameraMenu = _services.GetRequiredService<CameraMenuViewModel>();
             _trayIcon.ConfigureCameras(_cameraMenu);
+            _status = _services.GetRequiredService<StatusViewModel>();
+            _trayIcon.ConfigureStatus(_status);
             if (_configuration.GetValue<bool>("UseControllerStub"))
             {
                 _simulator = _services.GetRequiredService<KeyboardSimulator>();
@@ -87,6 +90,8 @@ public partial class App : System.Windows.Application
         int exitCode = 0;
         try
         {
+            if (_status is not null)
+                await _status.ShutdownAsync();
             if (_cameraMenu is not null)
                 await _cameraMenu.ShutdownAsync();
             if (_simulator is not null)

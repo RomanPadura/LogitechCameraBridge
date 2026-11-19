@@ -34,12 +34,15 @@ public static class ServiceRegistration
             services.AddSingleton<IControllerDiscovery, ControllerDiscovery>();
         services.AddSingleton<ICameraDiscovery, CameraDiscovery>();
         services.AddSingleton<ICameraBridgeManager, CameraBridgeManager>();
-        services.AddSingleton<IBridgeSession, BridgeSession>();
+        services.AddSingleton<BridgeActivity>();
+        services.AddSingleton<BridgeSession>();
+        services.AddSingleton<IBridgeSession, MonitoredBridgeSession>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<ICameraSelectionStore>(_ => new JsonCameraSelectionStore(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "LogitechCameraBridge", "userSettings.json")));
         services.AddSingleton<CameraMenuViewModel>();
+        services.AddSingleton<StatusViewModel>();
         return services;
     }
 }
