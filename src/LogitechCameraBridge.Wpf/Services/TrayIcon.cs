@@ -18,6 +18,7 @@ public sealed class TrayIcon : IDisposable
     private readonly ToolStripMenuItem _camerasItem = new("Cameras");
     private readonly ToolStripMenuItem _statusItem = new("Status");
     private readonly ToolStripMenuItem _controlsItem = new("Camera controls");
+    private readonly ToolStripMenuItem _aboutItem = new("About");
     private readonly ToolStripLabel _zoomValue = new("Zoom: Not checked");
     private readonly ToolStripLabel _panValue = new("Pan: Not checked");
     private readonly ToolStripLabel _tiltValue = new("Tilt: Not checked");
@@ -32,7 +33,7 @@ public sealed class TrayIcon : IDisposable
     public event EventHandler? ExitRequested;
     public event EventHandler? RestartRequested;
 
-    public TrayIcon()
+    public TrayIcon(AboutViewModel about)
     {
         _exitItem.Click += OnExitClick;
         _restartItem.Click += OnRestartClick;
@@ -42,6 +43,10 @@ public sealed class TrayIcon : IDisposable
         _menu.Items.Add(_controlsItem);
         _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Cameras unavailable") { Enabled = false });
         _menu.Items.Add(_camerasItem);
+        _aboutItem.DropDownItems.Add(new ToolStripLabel($"Version: {about.Version}"));
+        // Reserved for the future Velopack integration; clicking currently has no action.
+        _aboutItem.DropDownItems.Add(new ToolStripMenuItem("Check for updates"));
+        _menu.Items.Add(_aboutItem);
         _menu.Items.Add(_restartItem);
         _menu.Items.Add(_exitItem);
         _notifyIcon = new NotifyIcon
@@ -129,6 +134,7 @@ public sealed class TrayIcon : IDisposable
         _camerasItem.Enabled = false;
         _statusItem.Enabled = false;
         _controlsItem.Enabled = false;
+        _aboutItem.Enabled = false;
     }
 
     private void OnCameraMenuChanged(object? sender, PropertyChangedEventArgs e) => RenderCameras();

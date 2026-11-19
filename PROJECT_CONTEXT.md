@@ -19,7 +19,7 @@ SimulatorKeyResult and TrayIconState. Connector.Models contains ControllerConfig
 ControlRange, CameraControlSupport, CameraControlValue and CameraControlCapabilities.
 Cameras.Models contains CameraDeviceInfo. Services/managers/ViewModels reference these models.
 ViewModel classes remain in the owning project's ViewModels folder and namespace; WPF currently
-has MainViewModel, CameraMenuViewModel and StatusViewModel there. ViewModels are not data models.
+has MainViewModel, CameraMenuViewModel, StatusViewModel and AboutViewModel there. ViewModels are not data models.
 Configuration types retain Common.Options; native ABI structs remain local interop implementation
 details, and test fixtures/fakes remain with their tests. This organization change preserves behavior.
 
@@ -139,7 +139,7 @@ returns managed identity snapshots and releases native resources on its enumerat
 The console retains its independent synchronous lifecycle and USB selection by default.
 
 Pending: visual/hardware acceptance of restart/exit, exact image directions and range limits,
-About/Update, and prior physical-controller checks. The user has confirmed all six keyboard-stub
+Velopack updates/release versioning, and prior physical-controller checks. The user has confirmed all six keyboard-stub
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
@@ -193,6 +193,15 @@ Tooltips identify the state without relying only on color. Rendering tests expor
 TestResults/tray-icons-preview.png without starting the application or accessing devices.
 
 ## Hardware test status
+
+### About submenu
+
+About appears before Restart/Exit and contains Version: major.minor.build plus Check for updates.
+AboutViewModel in ViewModels reads typeof(MainViewModel).Assembly.GetName().Version.ToString(3).
+The model is constructed with the tray shell so About also works when JSON startup fails.
+Version is not hardcoded in menu code; future release workflows can set AssemblyVersion at build
+time. Check for updates is a clickable placeholder with no handler, networking or Velopack package.
+Velopack integration and GitHub Actions release version injection remain future work.
 
 ### Camera controls submenu
 

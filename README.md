@@ -32,7 +32,7 @@ dotnet run --project src/LogitechCameraBridge.Wpf
 ```
 
 The app uses .NET 10 WPF, MVVM, DI and the shared console appSettings.json. It has no startup
-window or taskbar button. Its tray menu contains Status, Camera controls, Cameras, Restart and Exit.
+window or taskbar button. Its tray menu contains Status, Camera controls, Cameras, About, Restart and Exit.
 
 Startup performs one attempt:
 
@@ -129,7 +129,10 @@ and dotnet-hosted launches, without opening a console window. The original dotne
 return to its terminal while the replacement continues running in the tray. Relaunch failures are
 logged and the old instance exits; launch the app manually if that happens.
 Startup configuration failures leave Restart and Exit available.
-About and Update remain future steps.
+About contains a read-only Version row and Check for updates. Version comes from the WPF assembly's
+AssemblyVersion and uses exactly three components (major.minor.build). Check for updates currently
+does nothing; Velopack integration is planned. Future GitHub Actions release builds can set
+AssemblyVersion through MSBuild properties; no release workflow or update client is added yet.
 
 Manual check:
 

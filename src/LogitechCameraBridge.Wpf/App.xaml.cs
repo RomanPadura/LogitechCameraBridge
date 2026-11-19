@@ -36,7 +36,7 @@ public partial class App : System.Windows.Application
         }
 
         // No Window is created: the application lives only in the notification area.
-        _trayIcon = new TrayIcon();
+        _trayIcon = new TrayIcon(new AboutViewModel());
         _trayIcon.ExitRequested += OnExitRequested;
         _trayIcon.RestartRequested += OnRestartRequested;
 
