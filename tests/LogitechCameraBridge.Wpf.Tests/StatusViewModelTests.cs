@@ -1,3 +1,4 @@
+using HidSharp;
 using LogitechCameraBridge.Cameras.Interfaces;
 using LogitechCameraBridge.Cameras.Models;
 using LogitechCameraBridge.Common.Options;
@@ -6,186 +7,176 @@ using LogitechCameraBridge.Controllers.Interfaces;
 using LogitechCameraBridge.Logger.Interfaces;
 using LogitechCameraBridge.Wpf.Services;
 using LogitechCameraBridge.Wpf.ViewModels;
-using HidSharp;
 using Microsoft.Extensions.Options;
 
 namespace LogitechCameraBridge.Wpf.Tests;
 
 public class StatusViewModelTests
 {
+    [Fact]
+    public Task StartupRunsWithoutKeyboardInputAndDoesNotRetry() => MainViewModelTests.OnDispatcherAsync(async () =>
+    {
+        var f = new Fixture();
+        await f.Model.InitializeAsync();
+        Assert.Equal(new DeviceStatus("found: Stub", false), f.Model.Controller);
+        Assert.Equal(new DeviceStatus("found: Camera", false), f.Model.Camera);
+        Assert.True(f.Model.Active);
+        Assert.Equal("device-1", f.Options.Value.DevicePath);
+        await f.Model.InitializeAsync();
+        Assert.Equal(1, f.Session.Starts);
+        Assert.Equal(1, f.Cameras.Scans);
+        await f.Model.ShutdownAsync();
+        Assert.False(f.Model.Active);
+        Assert.True(f.Session.CleanedUp);
+    });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task FoundDevicesAreNotActiveUntilReadiness(bool ready)
+    public Task UnrestorableSelectionIsNotSelected(bool missingDevice) => MainViewModelTests.OnDispatcherAsync(async () =>
     {
-        var fixture = new Fixture();
-        if (ready)
-            fixture.Activity.Ready("device-1");
-        await fixture.Model.RefreshAsync();
-        Assert.Equal(new DeviceStatus("found: Stub", false), fixture.Model.Controller);
-        Assert.Equal(new DeviceStatus("found: Camera", false), fixture.Model.Camera);
-        Assert.Equal(ready, fixture.Model.Active);
-        Assert.Equal(0, fixture.Cameras.FiltersOpened);
-    }
-
-    [Theory]
-    [InlineData("not selected")]
-    [InlineData("not found")]
-    public async Task MissingCameraSelectionOrDeviceIsRedAndInactive(string expected)
-    {
-        var fixture = new Fixture();
-        fixture.Activity.Ready("device-1");
-        if (expected == "not selected")
-            fixture.Store.Camera = null;
-        else
-            fixture.Cameras.Available = [];
-        await fixture.Model.RefreshAsync();
-        Assert.Equal(new DeviceStatus(expected, true), fixture.Model.Camera);
-        Assert.False(fixture.Model.Active);
-    }
+        var f = new Fixture();
+        if (missingDevice) f.Cameras.Available = [];
+        else f.Store.Camera = null;
+        await f.Model.InitializeAsync();
+        Assert.Equal(new DeviceStatus("not selected", true), f.Model.Camera);
+        Assert.False(f.Model.Active);
+        Assert.Equal(0, f.Session.Starts);
+        await f.Model.ShutdownAsync();
+    });
 
     [Fact]
-    public async Task DifferentSelectedDeviceDoesNotInheritActiveOrErrorsFromPreviousSession()
+    public Task MissingControllerStillListsCameras() => MainViewModelTests.OnDispatcherAsync(async () =>
     {
-        var fixture = new Fixture();
-        fixture.Activity.Ready("different-device");
-        fixture.Activity.CameraError("different-device", "Old error");
-        await fixture.Model.RefreshAsync();
-        Assert.Equal(new DeviceStatus("found: Camera", false), fixture.Model.Camera);
-        Assert.False(fixture.Model.Active);
-    }
+        var f = new Fixture(new MissingController());
+        await f.Model.InitializeAsync();
+        Assert.Equal(new DeviceStatus("not found", true), f.Model.Controller);
+        Assert.Single(f.Menu.Cameras);
+        Assert.False(f.Model.Active);
+        Assert.Equal(0, f.Session.Starts);
+        await f.Model.ShutdownAsync();
+    });
 
     [Fact]
-    public async Task RuntimeCameraErrorIsRedAndRemainsUntilNewSession()
+    public Task SavedChoiceOnlyAffectsNextStartup() => MainViewModelTests.OnDispatcherAsync(async () =>
     {
-        var fixture = new Fixture();
-        fixture.Activity.Ready("device-1");
-        fixture.Activity.CameraError("device-1", "Camera Set failed");
-        await fixture.Model.RefreshAsync();
-        Assert.Equal(new DeviceStatus("Error...check logs", true), fixture.Model.Camera);
-        Assert.False(fixture.Model.Active);
-        fixture.Activity.Starting("device-1");
-        fixture.Activity.Ready("device-1");
-        await fixture.Model.RefreshAsync();
-        Assert.True(fixture.Model.Active);
-    }
+        var f = new Fixture();
+        var second = new CameraDeviceInfo("Other", "device-2");
+        f.Cameras.Available = [new("Camera", "device-1"), second];
+        await f.Model.InitializeAsync();
+        await f.Menu.SelectCommand.ExecuteAsync(second);
+        Assert.Equal(second, f.Store.Camera);
+        Assert.Equal("device-1", f.Options.Value.DevicePath);
+        Assert.Equal(1, f.Session.Starts);
+        Assert.True(f.Model.Active);
+        await f.Model.ShutdownAsync();
+    });
 
     [Fact]
-    public async Task MissingPhysicalControllerIsRedEvenWithReadyCamera()
+    public Task FailedStartupNeverRetries() => MainViewModelTests.OnDispatcherAsync(async () =>
     {
-        var fixture = new Fixture(new PhysicalDiscovery { Missing = true });
-        fixture.Activity.Ready("device-1");
-        await fixture.Model.RefreshAsync();
-        Assert.Equal(new DeviceStatus("not found", true), fixture.Model.Controller);
-        Assert.Equal(new DeviceStatus("found: Camera", false), fixture.Model.Camera);
-        Assert.False(fixture.Model.Active);
-        Assert.NotEmpty(fixture.Logger.Errors);
-    }
+        var f = new Fixture();
+        f.Session.StartFailure = new InvalidOperationException("Camera failed");
+        await f.Model.InitializeAsync();
+        Assert.Equal(new DeviceStatus("Error...check logs", true), f.Model.Camera);
+        Assert.False(f.Model.Active);
+        await f.Model.InitializeAsync();
+        Assert.Equal(1, f.Session.Starts);
+        await f.Model.ShutdownAsync();
+    });
 
     [Fact]
-    public async Task PhysicalDiscoveryUsesConfiguredIdentityAndShowsLogitech()
+    public Task RuntimeFailureStopsWorkerAndRequiresRestart() => MainViewModelTests.OnDispatcherAsync(async () =>
     {
-        var discovery = new PhysicalDiscovery();
-        var fixture = new Fixture(discovery);
-        await fixture.Model.RefreshAsync();
-        Assert.Equal(new DeviceStatus("found: Logitech", false), fixture.Model.Controller);
-        Assert.Equal((0x046D, 0x0857, 0xFF000001u), discovery.Identity);
-    }
+        var f = new Fixture();
+        await f.Model.InitializeAsync();
+        f.Activity.CameraError("device-1", "Set failed");
+        f.Session.Progress!.Report(new(false, "Set failed"));
+        await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        Assert.False(f.Model.Active);
+        Assert.Equal(new DeviceStatus("Error...check logs", true), f.Model.Camera);
+        await f.Model.InitializeAsync();
+        Assert.Equal(1, f.Session.Starts);
+        await f.Model.ShutdownAsync();
+        Assert.True(f.Session.CleanedUp);
+    });
 
     [Fact]
-    public async Task EnumerationErrorIsLoggedAndRedAndRefreshCanRecover()
+    public Task ShutdownCanCancelStartupBeforeReady() => MainViewModelTests.OnDispatcherAsync(async () =>
     {
-        var fixture = new Fixture();
-        fixture.Cameras.Failure = new InvalidOperationException("Enumeration failed");
-        await fixture.Model.RefreshAsync();
-        Assert.Equal(new DeviceStatus("Error...check logs", true), fixture.Model.Camera);
-        Assert.False(fixture.Model.Active);
-        Assert.Contains(fixture.Logger.Errors, error => error.Contains("Enumeration failed"));
-        fixture.Cameras.Failure = null;
-        await fixture.Model.RefreshAsync();
-        Assert.False(fixture.Model.Camera.IsError);
-    }
-
-    [Fact]
-    public async Task ShutdownWaitsForRefreshAndPreventsNewScans()
-    {
-        var fixture = new Fixture();
-        var load = new TaskCompletionSource<CameraDeviceInfo?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        fixture.Store.PendingLoad = load.Task;
-        var refresh = fixture.Model.RefreshAsync();
-        // Controller discovery finishes asynchronously before the blocked store read.
-        var closing = fixture.Model.ShutdownAsync();
-        Assert.False(closing.IsCompleted);
-        load.SetResult(fixture.Store.Camera);
-        await Task.WhenAll(refresh, closing).WaitAsync(TimeSpan.FromSeconds(10));
-        int scans = fixture.Cameras.Scans;
-        await fixture.Model.RefreshAsync();
-        Assert.Equal(scans, fixture.Cameras.Scans);
-        Assert.False(fixture.Model.Active);
-    }
+        var f = new Fixture();
+        f.Session.Ready = false;
+        var startup = f.Model.InitializeAsync();
+        await f.Session.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(f.Model.Active);
+        await f.Model.ShutdownAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await startup;
+        Assert.True(f.Session.CleanedUp);
+        Assert.False(f.Model.Active);
+    });
 
     private sealed class Fixture
     {
         public FakeCameras Cameras { get; } = new();
         public FakeStore Store { get; } = new();
-        public RecordingLogger Logger { get; } = new();
         public BridgeActivity Activity { get; } = new();
+        public FakeSession Session { get; }
+        public CameraMenuViewModel Menu { get; }
+        public IOptions<CameraToControlOptions> Options { get; } = Microsoft.Extensions.Options.Options.Create(new CameraToControlOptions());
         public StatusViewModel Model { get; }
-        public Fixture(IControllerDiscovery? discovery = null)
+        public Fixture(IControllerDiscovery? controller = null)
         {
-            Model = new StatusViewModel(discovery ?? new ControllerDiscoveryStub(Logger), Cameras, Store,
-                Options.Create(new BridgeControllerDeviceOptions
-                {
-                    Vid = "0x046D", Pid = "0x0857", UsagePage = "0xFF00", Usage = "0x0001"
-                }), Activity, Logger);
+            var logger = new SilentLogger();
+            Menu = new(Cameras, Store, logger);
+            Session = new(Activity);
+            Model = new(controller ?? new ControllerDiscoveryStub(logger), Menu,
+                Microsoft.Extensions.Options.Options.Create(new BridgeControllerDeviceOptions
+                { Vid = "046D", Pid = "0857", UsagePage = "FF00", Usage = "0001" }),
+                Options, Session, Activity, logger);
         }
     }
-
+    private sealed class FakeSession(BridgeActivity activity) : IBridgeSession
+    {
+        public int Starts { get; private set; }
+        public bool Ready { get; set; } = true;
+        public bool CleanedUp { get; private set; }
+        public Exception? StartFailure { get; set; }
+        public IProgress<BridgeNotification>? Progress { get; private set; }
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public async Task RunAsync(IProgress<BridgeNotification> progress, CancellationToken cancellationToken)
+        {
+            Starts++;
+            Progress = progress;
+            if (StartFailure is not null) throw StartFailure;
+            try
+            {
+                if (Ready) { activity.Ready("device-1"); progress.Report(new(true)); }
+                Entered.SetResult();
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+            finally { activity.Stopped("device-1"); CleanedUp = true; }
+        }
+    }
     private sealed class FakeStore : ICameraSelectionStore
     {
         public CameraDeviceInfo? Camera { get; set; } = new("Camera", "device-1");
-        public Task<CameraDeviceInfo?>? PendingLoad { get; set; }
-        public Task<CameraDeviceInfo?> LoadAsync() => PendingLoad ?? Task.FromResult(Camera);
-        public Task SaveAsync(CameraDeviceInfo camera) => throw new NotSupportedException();
+        public Task<CameraDeviceInfo?> LoadAsync() => Task.FromResult(Camera);
+        public Task SaveAsync(CameraDeviceInfo camera) { Camera = camera; return Task.CompletedTask; }
     }
-
     private sealed class FakeCameras : ICameraDiscovery
     {
         public IReadOnlyList<CameraDeviceInfo> Available { get; set; } = [new("Camera", "device-1")];
-        public Exception? Failure { get; set; }
-        public int FiltersOpened { get; private set; }
         public int Scans { get; private set; }
-        public IReadOnlyList<CameraDeviceInfo> FindCameras()
-        {
-            Scans++;
-            if (Failure is not null)
-                throw Failure;
-            return Available;
-        }
-        public object CreateCameraFilter(int vid, int pid, string usbInterface)
-        {
-            FiltersOpened++;
-            throw new InvalidOperationException("Status must not open filters.");
-        }
+        public IReadOnlyList<CameraDeviceInfo> FindCameras() { Scans++; return Available; }
+        public object CreateCameraFilter(int vid, int pid, string usbInterface) => throw new NotSupportedException();
     }
-
-    private sealed class PhysicalDiscovery : IControllerDiscovery
+    private sealed class MissingController : IControllerDiscovery
     {
-        public bool Missing { get; set; }
-        public (int, int, uint) Identity { get; private set; }
-        public HidDevice FindController(int vid, int pid, uint fullUsage)
-        {
-            Identity = (vid, pid, fullUsage);
-            if (Missing)
-                throw new ControllerNotFoundException("Controller missing");
-            return new ControllerDiscoveryStub(new RecordingLogger()).FindController(vid, pid, fullUsage);
-        }
+        public HidDevice FindController(int vid, int pid, uint fullUsage) => throw new ControllerNotFoundException("Missing");
     }
-
-    private sealed class RecordingLogger : ICameraBridgeLogger
+    private sealed class SilentLogger : ICameraBridgeLogger
     {
-        public List<string> Errors { get; } = [];
         public void LogInfo(string message) { }
-        public void LogError(string message) => Errors.Add(message);
+        public void LogError(string message) { }
     }
 }

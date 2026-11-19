@@ -14,6 +14,8 @@ public partial class CameraMenuViewModel(
 {
     private Task _operation = Task.CompletedTask;
     private bool _isClosing;
+    private bool _scanned;
+    private bool _failed;
 
     [ObservableProperty]
     private IReadOnlyList<CameraDeviceInfo> _cameras = [];
@@ -29,13 +31,14 @@ public partial class CameraMenuViewModel(
     [NotifyCanExecuteChangedFor(nameof(SelectCommand))]
     private bool _isBusy;
 
-    private bool CanInteract() => !IsBusy && !_isClosing;
+    private bool CanInteract() => !IsBusy && !_isClosing && !_failed;
 
     [RelayCommand(CanExecute = nameof(CanInteract))]
     private Task RefreshAsync()
     {
-        if (!CanInteract())
+        if (_scanned || !CanInteract())
             return Task.CompletedTask;
+        _scanned = true;
         IsBusy = true;
         _operation = RefreshCoreAsync();
         return _operation;
@@ -52,6 +55,7 @@ public partial class CameraMenuViewModel(
         }
         catch (Exception ex)
         {
+            _failed = true;
             Cameras = [];
             Error = "Could not load cameras or saved selection";
             logger.LogError(ex.ToString());
@@ -82,6 +86,7 @@ public partial class CameraMenuViewModel(
         }
         catch (Exception ex)
         {
+            _failed = true;
             Error = "Could not save camera selection";
             logger.LogError(ex.ToString());
         }

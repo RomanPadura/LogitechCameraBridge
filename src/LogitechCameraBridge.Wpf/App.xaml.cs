@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Windows;
 using LogitechCameraBridge.Logger;
 using LogitechCameraBridge.Wpf.Services;
@@ -13,7 +14,6 @@ public partial class App : System.Windows.Application
     private TrayIcon? _trayIcon;
     private IConfigurationRoot? _configuration;
     private ServiceProvider? _services;
-    private MainViewModel? _viewModel;
     private CameraMenuViewModel? _cameraMenu;
     private CameraBridgeLogger? _logger;
     private bool _isExiting;
@@ -21,7 +21,7 @@ public partial class App : System.Windows.Application
     private KeyboardSimulator? _simulator;
     private StatusViewModel? _status;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -39,21 +39,23 @@ public partial class App : System.Windows.Application
                 .AddCameraBridge(_configuration)
                 .BuildServiceProvider();
             _logger = _services.GetRequiredService<CameraBridgeLogger>();
-            _viewModel = _services.GetRequiredService<MainViewModel>();
             _cameraMenu = _services.GetRequiredService<CameraMenuViewModel>();
             _trayIcon.ConfigureCameras(_cameraMenu);
             _status = _services.GetRequiredService<StatusViewModel>();
             _trayIcon.ConfigureStatus(_status);
+            _cameraMenu.PropertyChanged += OnCameraMenuChanged;
             if (_configuration.GetValue<bool>("UseControllerStub"))
             {
                 _simulator = _services.GetRequiredService<KeyboardSimulator>();
                 _hotkeys = new SimulatorHotkeys();
                 _hotkeys.Pressed += OnSimulatorKey;
             }
-            _logger.LogInfo("Tray application started. Stub keyboard commands open the saved camera on demand.");
+            _logger.LogInfo("Tray application started. Initializing bridge once.");
+            await _status.InitializeAsync();
         }
         catch (Exception ex)
         {
+            _status?.Fail(ex);
             // Keep Exit available even when configuration cannot be loaded.
             Trace.TraceError(ex.ToString());
             _logger?.LogError(ex.ToString());
@@ -64,7 +66,7 @@ public partial class App : System.Windows.Application
 
     private async void OnSimulatorKey(SimulatorButton button)
     {
-        if (_isExiting || _simulator is null)
+        if (_isExiting || _simulator is null || _status?.Active != true)
             return;
         try
         {
@@ -72,10 +74,17 @@ public partial class App : System.Windows.Application
         }
         catch (Exception ex)
         {
+            _status?.Fail(ex);
             _logger?.LogError(ex.ToString());
             if (!_isExiting)
                 _trayIcon?.ShowError(ex.Message);
         }
+    }
+
+    private void OnCameraMenuChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CameraMenuViewModel.Error) && !string.IsNullOrEmpty(_cameraMenu?.Error))
+            _status?.Fail(new InvalidOperationException(_cameraMenu.Error));
     }
 
     private async void OnExitRequested(object? sender, EventArgs e)
@@ -94,10 +103,6 @@ public partial class App : System.Windows.Application
                 await _status.ShutdownAsync();
             if (_cameraMenu is not null)
                 await _cameraMenu.ShutdownAsync();
-            if (_simulator is not null)
-                await _simulator.ShutdownAsync();
-            if (_viewModel is not null)
-                await _viewModel.ShutdownAsync();
             if (_logger is not null)
             {
                 _logger.LogInfo("Tray application stopped.");
@@ -117,6 +122,8 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_cameraMenu is not null)
+            _cameraMenu.PropertyChanged -= OnCameraMenuChanged;
         _hotkeys?.Dispose();
         if (_trayIcon is not null)
         {

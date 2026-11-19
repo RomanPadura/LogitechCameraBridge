@@ -21,7 +21,7 @@
 - Console app: JSON configuration, DI registrations, Ctrl+C handling.
 - Connector.Tests: simulated camera-control tests; no physical hardware access.
 - Wpf: .NET 10 Windows tray executable with CommunityToolkit.Mvvm, DI/options, a dedicated
-  MTA worker and MainViewModel. The tray shell exposes Status/Cameras/Exit; keyboard simulation starts the bridge on demand.
+  MTA worker and MainViewModel. The tray shell exposes Status/Cameras/Exit; the bridge initializes once at startup.
 - Wpf.Tests: worker cancellation/cleanup, overlap protection, failure/retry, and ViewModel
   readiness/error/shutdown and camera-menu tests on a WPF dispatcher, plus JSON persistence tests; no hardware access.
 
@@ -60,11 +60,7 @@ Prefix state is reconciled before action events to avoid stale state after misse
 No window/taskbar button is created. Hook installation errors surface through the tray; Exit removes
 the hook before cancelling the worker. Real hook/foreground keyboard behavior still requires manual verification.
 
-`KeyboardSimulator` loads the saved selection on each command. It starts the bridge lazily, waits for
-the readiness callback, and submits the configured report ID/button code. Concurrent commands while
-starting/switching are dropped. A changed identity cancels/awaits the old worker before updating the
-shared options and starting again. Shutdown cancels startup and waits for cleanup; background failures
-are observed/logged. No movement occurs at app startup or merely on camera selection.
+KeyboardSimulator only submits reports to the already-ready startup bridge. It never loads selection, starts, retries or switches a session.
 
 `CameraToControlOptions.DevicePath` and an exact-path discovery overload allow selected-camera
 binding without USB identity assumptions or fallback. The manager bypasses USB configuration when
@@ -78,7 +74,7 @@ Button codes are configured in `BridgeControllerDevice`; all six codes must be d
 Zoom is required. Unavailable/manual-unsupported/invalid Pan or Tilt ranges are logged and skipped.
 On each supported button report, read the current property, add or subtract one driver step,
 clamp to Min/Max, and call `Set` with `CameraControlFlags.Manual` if the value changes.
-Every control HRESULT is checked. Runtime command failures are logged and do not stop other controls.
+Every control HRESULT is checked. Failures are logged: console continues processing; WPF cancels the session and requires restart.
 Right/Up initially increase values; Left/Down decrease them. Physical image directions are pending verification.
 No reset, hold/repeat, automatic zoom adjustment, reconnection, or WPF window is implemented yet.
 
@@ -97,98 +93,51 @@ notifications, prevents overlapping starts, and waits for cancellation during St
 `UiCameraBridgeLogger` forwards logging to the existing options-controlled logger and exposes
 runtime errors to the ViewModel. The original JSON file is linked into the WPF output.
 
-## Tray application
+## Tray application: one startup attempt
 
-The user specified a tray-only application: no startup window and no regular taskbar button.
-`App.xaml` uses `OnExplicitShutdown` without a StartupUri. `TrayIcon` uses Windows Forms
-`NotifyIcon` with a standard application icon, the LogitechCameraBridge tooltip, Cameras and Exit.
-Windows Forms support is enabled for this notification-area component; the host remains WPF.
-No Window is constructed. Exit disables repeat requests, awaits ViewModel shutdown and logger
-flush, calls WPF Shutdown, and disposes the icon/menu/icon resource, DI provider and configuration.
-Configuration failures leave the tray shell available with a startup-failed tooltip and Exit.
+App creates no startup window/taskbar button. NotifyIcon exposes Status, Cameras and Exit.
+The shared console JSON is linked into WPF output/publish. UseControllerStub selects stub/physical DI.
 
-The original console JSON remains the single source file, linked into WPF output/publish.
-The tray shell starts the stub bridge only on a keyboard command. It enumerates cameras when Cameras is opened,
-without opening camera filters or starting capture.
+StatusViewModel.InitializeAsync is invoked automatically, once per process. It discovers the
+controller, initializes CameraMenuViewModel (loads selection and enumerates cameras off the UI thread),
+and matches the saved exact device identity. Missing/unavailable choice is not selected; no fallback.
+Cameras are listed even when the controller is missing. If both are available, it sets DevicePath,
+runs the monitored bridge, and waits for actual readiness before Active: true. Startup sends no
+button reports and performs no movement or video capture. It owns session cancellation and shutdown.
 
-### Camera selection
+There is no lazy keyboard startup, retry, reconnection, live switching or menu-triggered rescan.
+Repeated initialization calls return the same startup task. Camera selection only saves a choice
+for the next launch, with a restart notification. The running camera/status stays the startup choice.
+CameraMenuViewModel latches scan/save failures. Initialization/runtime faults make Active false,
+retain Error...check logs, cancel the worker and require restart. App blocks keys unless Active.
 
-`ICameraDiscovery.FindCameras()` enumerates DirectShow video inputs and returns managed
-`CameraDeviceInfo(Name, DevicePath)` records. It releases COM monikers on the enumeration thread.
-Devices without a usable identity are omitted; duplicate paths are deduplicated. Discovery remains
-independent of the configured VID/PID, so the menu includes other camera models and virtual inputs
-registered with DirectShow. Camera-control capability is not probed in this step.
+Status rows are read-only ToolStripLabels with red error/no-selection/inactive text. Controller shows
+found: Stub / found: Logitech / not found / Error...check logs. ControllerNotFoundException derives
+from InvalidOperationException. Camera shows found: <name> / not selected / Error...check logs.
+Status is updated by startup and worker progress, without continuous hotplug monitoring.
 
-`CameraMenuViewModel` loads the saved choice and scans on a background MTA thread-pool thread
-on every Cameras opening. UI stays responsive; overlapping scans/selections are rejected.
-Only a successful save changes the checked selection. Missing saved cameras remain displayed as
-saved/unavailable, rather than falling back to a different device. Duplicate names have numbered labels.
-Exit disables new interactions and awaits in-flight camera operations before flushing logs/disposal.
+MonitoredBridgeSession/BridgeActivity retain actual readiness and observed worker failures.
+Optional-axis initialization warnings do not invalidate working Zoom. MainViewModel remains an
+unused foundation/example in this host; App no longer resolves it. HID/COM work and disposal stay
+on BridgeSession's dedicated MTA worker. Exit awaits startup/session and pending settings writes,
+flushes logger writes, removes the hook/icon and disposes services.
 
-`JsonCameraSelectionStore` persists `SelectedCamera` with `Name` and `DevicePath` in
-`%LocalAppData%\LogitechCameraBridge\userSettings.json`. This per-user state survives builds and is
-separate from the linked shared appSettings.json. Reads/writes are serialized, unknown JSON settings
-are preserved, and replacement follows a complete temporary-file write in the same directory.
-Malformed settings are reported and never silently overwritten. Save failures keep the previous
-selection and request a tray error notification; detailed failures go to the logger.
-The saved identity is loaded when the menu opens and on keyboard commands for exact camera binding.
+JsonCameraSelectionStore persists Name/DevicePath under SelectedCamera in
+`%LocalAppData%\LogitechCameraBridge\userSettings.json`. Unknown keys are preserved, invalid JSON
+is not overwritten, and replacement follows a complete temporary-file write. Camera enumeration
+returns managed identity snapshots and releases native resources on its enumeration thread.
+The console retains its independent synchronous lifecycle and USB selection by default.
 
-### Status submenu
+Pending: visual/hardware acceptance of automatic startup/exit and keyboard behavior, About/Update,
+and prior physical control checks. The earlier Computer Use inventory did not expose a targetable
+notification area, so no visual tray acceptance is claimed.
 
-`StatusViewModel.RefreshAsync` checks controller identity/discovery on a background thread, loads
-the saved camera identity and enumerates cameras asynchronously. It never opens a camera filter
-or controller stream or starts the bridge. Repeated concurrent refreshes share the pending task;
-shutdown waits for that task before service disposal.
-
-Controller displays found: Stub, found: Logitech, not found, or Error...check logs. The physical
-discovery now throws ControllerNotFoundException (derived from InvalidOperationException) for
-an absent device, allowing missing devices to be distinguished from other discovery/config errors.
-Camera displays found: <name>, not selected, not found, or Error...check logs. Errors are logged.
-Rows use read-only ToolStripLabels so error ForeColor remains red instead of disabled-item gray.
-Missing devices/no selection/errors and Active: false are red.
-
-`MonitoredBridgeSession` wraps the existing BridgeSession and publishes a thread-safe
-BridgeActivity snapshot keyed by camera path. It marks readiness only on the worker's callback,
-records terminal errors and runtime logger errors after readiness, and clears readiness when the
-run ends. It preserves progress forwarding and rejects overlapping runs without changing the
-existing session's state. Optional-axis initialization warnings before readiness do not block Zoom.
-
-Active is true only when both device checks succeed, the ready session targets the saved camera,
-and that session has no camera error. Merely starting or finding devices never implies Active.
-Changing selection cannot inherit readiness/errors from another device path. Found cameras are
-not necessarily compatible with IAMCameraControl. Status is refreshed when its submenu opens;
-it is not continuous hotplug monitoring. Runtime camera errors remain until the run stops/restarts.
-
-Planned separate steps (the user will verify and commit each step):
-
-1. Tray shell and Exit (implemented).
-2. Cameras submenu listing available cameras, selection, and JSON persistence across restarts (implemented).
-3. Status submenu with Controller, Camera and Active rows (implemented).
-   Automatic physical-controller startup using the saved camera remains pending.
-4. About and Update (update behavior still needs to be specified).
-
-Pending: visual tray/Cameras/Exit verification, real OS camera enumeration and persistence acceptance,
-automatic physical-controller bridge startup using the saved device identity,
-About/Update, and hardware lifecycle verification.
-Computer Use inventory did not expose the Windows taskbar/notification area as a targetable window,
-so the tray icon/menu/Exit behavior could not be visually verified in this session.
-
-Latest automated verification: solution build succeeded with zero warnings/errors; 31 connector/logger/stub
-tests and 57 WPF tests passed (88 total). Status tests cover found/missing/unselected/error states,
-readiness gating, previous-camera isolation, error recovery, configured controller identity,
-readiness clearing after stop/cancellation/failure, overlap protection, and shutdown waiting.
-These checks use simulated devices and do not verify the rendered menu colors or physical hardware.
-Chord tests cover all action keys, no-repeat behavior,
-prefix release ordering, unrelated keys, conflicting modifiers, action-before-prefix and missed prefix release.
-Other checks cover all six keyboard command reports,
-readiness gating, selection switching/cleanup, cancellation during startup, absent selection,
-stub report layout/queue disposal, exact selected-device routing and console USB routing.
-Tests also cover controller-stub identity, idle reads, stream
-disposal/reopening and true/false/missing-option DI registration, plus background scanning, selection timing,
-scan/save failure recovery, shutdown waiting, persistence across store instances, duplicate names,
-malformed settings, preservation of unrelated settings, and failed replacement without data loss.
-Build/test required execution outside sandbox restrictions. These tests do not establish hardware
-or visual acceptance of the camera menu.
+Latest automated checks: build without warnings/errors; 31 connector/logger/stub and 52 WPF tests
+passed (83 total). Tests now cover automatic startup without keys, a single initialization attempt,
+unavailable selection, missing controller, next-start selection persistence, restart-only failures,
+inactive keyboard suppression and shutdown cancellation. Existing simulated camera, HID stub,
+thread cleanup, DI, JSON and key-chord checks pass. Hardware/visual acceptance remains unverified.
+Build/test required execution outside sandbox restrictions.
 
 ## Hardware test status
 

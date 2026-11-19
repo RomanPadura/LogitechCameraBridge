@@ -71,11 +71,11 @@ public class CameraMenuViewModelTests
         Assert.Equal(first, model.SelectedCamera);
         Assert.Equal(first, store.Selected);
         Assert.Equal("Could not save camera selection", model.Error);
-        Assert.True(model.SelectCommand.CanExecute(second));
+        Assert.False(model.SelectCommand.CanExecute(second));
     });
 
     [Fact]
-    public Task EachRefreshReenumeratesIncludingAnEmptyList() => MainViewModelTests.OnDispatcherAsync(async () =>
+    public Task CameraListIsScannedOnlyOnce() => MainViewModelTests.OnDispatcherAsync(async () =>
     {
         int scans = 0;
         var model = new CameraMenuViewModel(new FakeDiscovery(() =>
@@ -83,13 +83,13 @@ public class CameraMenuViewModelTests
         await model.RefreshCommand.ExecuteAsync(null);
         Assert.Single(model.Cameras);
         await model.RefreshCommand.ExecuteAsync(null);
-        Assert.Empty(model.Cameras);
+        Assert.Single(model.Cameras);
         Assert.Empty(model.Error);
-        Assert.Equal(2, scans);
+        Assert.Equal(1, scans);
     });
 
     [Fact]
-    public Task ScanFailureIsVisibleAndNextRefreshCanRetry() => MainViewModelTests.OnDispatcherAsync(async () =>
+    public Task ScanFailureIsRetainedUntilRestart() => MainViewModelTests.OnDispatcherAsync(async () =>
     {
         int scans = 0;
         var model = new CameraMenuViewModel(new FakeDiscovery(() => ++scans == 1
@@ -98,7 +98,8 @@ public class CameraMenuViewModelTests
         Assert.NotEmpty(model.Error);
         Assert.Empty(model.Cameras);
         await model.RefreshCommand.ExecuteAsync(null);
-        Assert.Empty(model.Error);
+        Assert.NotEmpty(model.Error);
+        Assert.Equal(1, scans);
     });
 
     private sealed class FakeDiscovery(Func<IReadOnlyList<CameraDeviceInfo>> scan) : ICameraDiscovery

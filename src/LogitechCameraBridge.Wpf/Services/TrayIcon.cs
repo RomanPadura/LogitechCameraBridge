@@ -25,10 +25,8 @@ public sealed class TrayIcon : IDisposable
     public TrayIcon()
     {
         _exitItem.Click += OnExitClick;
-        _statusItem.DropDownOpening += OnStatusOpening;
         _statusItem.DropDownItems.AddRange([_controllerStatus, _cameraStatus, _activeStatus]);
         _menu.Items.Add(_statusItem);
-        _camerasItem.DropDownOpening += OnCamerasOpening;
         _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Cameras unavailable") { Enabled = false });
         _menu.Items.Add(_camerasItem);
         _menu.Items.Add(_exitItem);
@@ -48,12 +46,6 @@ public sealed class TrayIcon : IDisposable
         _status = status;
         _status.PropertyChanged += OnStatusChanged;
         RenderStatus();
-    }
-
-    private async void OnStatusOpening(object? sender, EventArgs e)
-    {
-        if (_status is not null)
-            await _status.RefreshAsync();
     }
 
     private void OnStatusChanged(object? sender, PropertyChangedEventArgs e) => RenderStatus();
@@ -84,12 +76,6 @@ public sealed class TrayIcon : IDisposable
         _exitItem.Enabled = false;
         _camerasItem.Enabled = false;
         _statusItem.Enabled = false;
-    }
-
-    private async void OnCamerasOpening(object? sender, EventArgs e)
-    {
-        if (_cameraMenu is not null && _cameraMenu.RefreshCommand.CanExecute(null))
-            await _cameraMenu.RefreshCommand.ExecuteAsync(null);
     }
 
     private void OnCameraMenuChanged(object? sender, PropertyChangedEventArgs e) => RenderCameras();
@@ -133,6 +119,9 @@ public sealed class TrayIcon : IDisposable
                     // The menu closes on click; make a failed save visible immediately.
                     if (!_isDisposed && !string.IsNullOrEmpty(_cameraMenu.Error))
                         _notifyIcon.ShowBalloonTip(5000, "Camera selection", _cameraMenu.Error, ToolTipIcon.Error);
+                    else if (!_isDisposed)
+                        _notifyIcon.ShowBalloonTip(5000, "Camera selection",
+                            "Camera saved. Restart the application to use this selection.", ToolTipIcon.Info);
                 };
                 _camerasItem.DropDownItems.Add(item);
             }
@@ -174,8 +163,6 @@ public sealed class TrayIcon : IDisposable
             _cameraMenu.PropertyChanged -= OnCameraMenuChanged;
         if (_status is not null)
             _status.PropertyChanged -= OnStatusChanged;
-        _statusItem.DropDownOpening -= OnStatusOpening;
-        _camerasItem.DropDownOpening -= OnCamerasOpening;
         _exitItem.Click -= OnExitClick;
         _menu.Dispose();
         _icon.Dispose();

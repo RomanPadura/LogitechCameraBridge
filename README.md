@@ -24,40 +24,52 @@ Camera discovery/control is real. The console host does not register simulator h
 
 ## WPF tray app
 
-`src/LogitechCameraBridge.Wpf` targets `net10.0-windows` and uses CommunityToolkit.Mvvm,
-DI and options from the same linked `LogitechCameraBridgeConsole/appSettings.json`.
-Run it from the VS Code PowerShell terminal:
+Run from the VS Code PowerShell terminal:
 
 ```powershell
 dotnet run --project src/LogitechCameraBridge.Wpf
 ```
 
-The app creates no startup window or taskbar button. Find the standard application icon
-in the Windows notification area (possibly under **Show hidden icons**). Hover over it to
-identify `LogitechCameraBridge`, then right-click for **Status**, **Cameras** and **Exit**.
-The app starts a stub bridge on the first simulator shortcut. Camera discovery lists Windows DirectShow video inputs
-without opening camera filters or starting video capture.
-Exit flushes queued logs, disposes services and removes the tray icon before the process ends.
-If configuration startup fails, the tooltip says `LogitechCameraBridge - startup failed`;
-Exit remains available and no error window is shown.
+The app uses .NET 10 WPF, MVVM, DI and the shared console appSettings.json. It has no startup
+window or taskbar button. Its tray menu contains Status, Cameras and Exit.
 
-Open **Cameras** to refresh the device list asynchronously. Select a camera to save its name and
-device path in `%LocalAppData%\LogitechCameraBridge\userSettings.json`. A check mark indicates
-the saved choice; identical camera names receive numbered labels. The device path distinguishes
-individual cameras. When the saved camera is disconnected, the menu retains a disabled
-`(saved; unavailable)` entry instead of silently selecting another camera.
-The saved choice is restored when the menu is opened after restarting the app.
+Startup performs one attempt:
 
-User preferences are separate from the shared `appSettings.json`, so rebuilds do not replace the
-selection. Writes preserve other JSON settings and replace the file after the new document is
-complete. Invalid JSON is reported without overwriting the file. Scan/save errors appear in the menu
-and are logged; failed saves also request a tray notification. A failed save retains the previous choice.
-Exit waits for an in-progress scan or save before disposing application services.
-Automatic bridge startup using this selection when a controller is found is a later step.
+1. Find the configured controller and publish its status.
+2. Enumerate cameras and restore the saved choice by its exact device path.
+3. If the saved choice is absent/unavailable, show Camera: not selected without choosing a fallback.
+4. If both devices are available, initialize controls and open controller input on the worker.
+5. Publish Active: true only after readiness. No keyboard command is required to start.
+
+This applies to stub and physical controller modes. Startup starts no video capture and performs
+no camera movements. Camera controls require driver support for IAMCameraControl and manual Zoom.
+Optional Pan/Tilt may be unavailable without preventing Zoom initialization.
+
+There are no rescans, retries, reconnections or live camera switching. After an error, Active becomes
+false and the worker is cancelled. Check logger.txt and restart the application. Opening menus only
+shows the startup device list and current session status; it does not retry discovery or initialization.
+
+Select a camera in Cameras to save Name/DevicePath in
+`%LocalAppData%\LogitechCameraBridge\userSettings.json`, then restart to use it. The running camera
+remains the startup choice. The menu confirms that the new choice is saved for the next startup.
+Preferences survive builds and remain separate from shared appSettings.json. Unknown JSON settings
+are preserved; invalid JSON is reported without overwriting it. Failed saves retain the old choice.
+
+### Status
+
+| Row | Values |
+| --- | --- |
+| Controller | found: Stub, found: Logitech, not found, or Error...check logs |
+| Camera | found: <name>, not selected, or Error...check logs |
+| Active | true or false |
+
+Missing devices, no selection, errors and Active: false are red. Status updates from initialization
+and observed worker events without menu-triggered rescans. A found camera alone does not establish
+readiness. Errors remain until restart. Unsupported optional axes during initialization do not block Zoom.
 
 ### Keyboard simulator
 
-With `UseControllerStub: true`, select a camera from **Cameras**, then use these global shortcuts:
+With UseControllerStub: true, commands work only after startup reports Active: true:
 
 | Shortcut | Action |
 | --- | --- |
@@ -66,66 +78,25 @@ With `UseControllerStub: true`, select a camera from **Cameras**, then use these
 | Hold P, press Left/Right | Pan Left/Right |
 | Hold P, press Up/Down | Tilt Up/Down |
 
-Press the prefix first and keep it held while pressing the action key. These are Windows virtual
-Z/P keys (the same key positions with a non-Latin layout). The shifted main + key is supported.
-Chords work while another application has focus, only while WPF runs in stub mode. A Windows
-low-level keyboard hook recognizes them without logging typed text. Z/P and ordinary keys pass
-to the foreground application; recognized action keys, their repeats and releases are consumed.
-Use a preview window rather than a text field during testing. Ctrl/Alt/Windows modifiers or holding
-both Z and P prevent movement. Injected input is ignored. Hook installation failure requests a tray
-error; Exit remains available. Exit removes the hook.
+Press the prefix first. Z/P are Windows virtual keys (same key positions in non-Latin layouts).
+Shifted main + is supported. The keyboard hook recognizes global chords only in stub mode and
+logs no text. Z/P and ordinary keys pass through; action keys, repeats and releases are consumed.
+Ctrl/Alt/Windows modifiers, both prefixes held, or injected input do not generate commands.
+One press submits one configured report without auto-repeat. Keys never start/restart/switch the bridge.
+Use a preview window to observe actual movement. Do not run console and WPF bridges simultaneously.
 
-The first command opens the saved camera by its exact device path and waits for camera initialization
-and the stub input stream. No camera is selected automatically if the saved camera is unavailable.
-After changing **Cameras**, the next command stops/releases the previous session before opening the
-new camera. Each press sends one configured HID report through the normal bridge control path.
-Key repeat does not generate commands; commands received during connection/switching are dropped.
-The stub input queue is bounded and is cleared when the stream closes.
-These commands physically control the camera, without starting capture. Open a preview separately
-to observe movement; Zoom must be supported, and Pan/Tilt may be unavailable. Use short presses.
-Exit removes the keyboard hook, cancels the worker and waits for HID/COM cleanup. Errors go to logger.txt
-and command failures request a tray notification. Physical controller startup remains future work.
+Exit removes the hook, cancels startup/processing, awaits HID/COM cleanup and pending settings writes,
+flushes logs and disposes the icon/services. Startup configuration failures leave Exit available.
+About and Update remain future steps.
 
-### Status menu
+Manual check:
 
-Opening **Status** refreshes three read-only rows asynchronously:
-
-| Row | Values |
-| --- | --- |
-| Controller | `found: Stub`, `found: Logitech`, `not found`, or `Error...check logs` |
-| Camera | `found: <name>`, `not selected`, `not found`, or `Error...check logs` |
-| Active | `true` or `false` |
-
-Missing devices, no selected camera, errors and `Active: false` are red. Checks only enumerate
-devices; opening Status does not start the bridge, bind a camera filter or move the camera.
-`Camera: found` confirms presence in the OS, not camera-control capabilities.
-`Active: true` additionally requires the bridge readiness callback for the currently selected camera,
-no reported runtime camera error, and successful controller/camera checks. Before the first simulator
-command, Active remains false even when both devices are found. A changed camera selection cannot
-inherit Active or an error from the previous camera's session. Initialization/terminal failures and
-runtime control errors show `Error...check logs`; unsupported optional axes logged before readiness
-do not block Zoom or force the ready camera into an error state. Check `logger.txt` for details.
-Status is a snapshot refreshed on opening, not continuous hotplug monitoring.
-
-The foundation includes a dedicated MTA bridge worker, cancellation, overlapping-run protection,
-and a ViewModel with Start/Stop commands, readiness status and error reporting.
-Running status requires camera initialization and an open HID stream; it is not inferred from
-the requested start operation. It is a startup readiness signal, not continuous connection monitoring.
-Stop and `ShutdownAsync` wait for the worker to release device resources. Exit calls `ShutdownAsync`
-before disposing application services; automatic bridge startup is reserved for a later step.
-Do not run the console host and a bridge-enabled WPF host simultaneously during hardware tests.
-
-Manual tray check:
-
-1. Run the command and verify that no window or application taskbar button appears.
-2. Open **Cameras** and verify that the available cameras appear. With no cameras, expect **No cameras found**.
-3. Select a camera, reopen the menu, and verify its check mark and the `SelectedCamera` JSON entry.
-4. Choose **Exit**, restart, and open **Cameras** to verify that the same choice is checked.
-5. Disconnect the selected camera and reopen the menu: its saved identity should remain unavailable.
-6. Choose **Exit** and confirm that the icon disappears and `dotnet run` returns to the prompt.
-
-Subsequent steps will add physical-controller bridge startup, followed by **About** and **Update**.
-Each step is kept separate for user verification and a user-created commit.
+1. Start with a saved available camera; inspect Status without pressing simulator keys.
+2. Expect Active: true after successful initialization, or an explicit device/error status.
+3. Save a different camera, exit and restart; confirm the new startup camera is used.
+4. Start with an unavailable saved camera: expect not selected and Active: false.
+5. After a startup/runtime error, check logs and restart. Menus/keys must not cause a retry.
+6. Exit during startup/processing; confirm the process and icon disappear cleanly.
 
 ## Controller commands
 
