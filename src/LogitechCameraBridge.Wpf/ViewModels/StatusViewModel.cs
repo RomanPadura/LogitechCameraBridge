@@ -23,9 +23,9 @@ public partial class StatusViewModel(
     ICameraBridgeLogger logger) : ObservableObject
 {
     [ObservableProperty]
-    private DeviceStatus _controller = new("checking...", false);
+    private DeviceStatus _controller = new("Checking...", false);
     [ObservableProperty]
-    private DeviceStatus _camera = new("checking...", false);
+    private DeviceStatus _camera = new("Checking...", false);
     [ObservableProperty]
     private bool _active;
 
@@ -51,23 +51,27 @@ public partial class StatusViewModel(
         bool controllerFound = false;
         try
         {
-            await Task.Run(() =>
+            string controllerName = await Task.Run(() =>
             {
                 var options = controllerOptions.Value;
-                controllers.FindController(ReadHex(options.Vid), ReadHex(options.Pid),
+                var device = controllers.FindController(ReadHex(options.Vid), ReadHex(options.Pid),
                     ((uint)ReadHex(options.UsagePage) << 16) | ReadHex(options.Usage));
+                if (controllers is ControllerDiscoveryStub)
+                    return "Stub";
+                string name = device.GetFriendlyName();
+                return string.IsNullOrWhiteSpace(name) ? "Logitech" : name;
             });
-            Controller = new(controllers is ControllerDiscoveryStub ? "found: Stub" : "found: Logitech", false);
+            Controller = new(controllerName, false);
             controllerFound = true;
         }
         catch (ControllerNotFoundException ex)
         {
-            Controller = new("not found", true);
+            Controller = new("Not found", true);
             logger.LogError(ex.Message);
         }
         catch (Exception ex)
         {
-            Controller = new("Error...check logs", true);
+            Controller = new("Error", true);
             logger.LogError(ex.ToString());
         }
         if (_closing)
@@ -78,7 +82,7 @@ public partial class StatusViewModel(
             return;
         if (!string.IsNullOrEmpty(cameraMenu.Error))
         {
-            Camera = new("Error...check logs", true);
+            Camera = new("Error", true);
             return;
         }
         var selected = cameraMenu.SelectedCamera;
@@ -86,10 +90,10 @@ public partial class StatusViewModel(
             camera.DevicePath, selected.DevicePath, StringComparison.OrdinalIgnoreCase));
         if (found is null)
         {
-            Camera = new("not selected", true);
+            Camera = new("Not selected", true);
             return;
         }
-        Camera = new($"found: {found.Name}", false);
+        Camera = new(found.Name, false);
         if (!controllerFound || _failed)
             return;
 
@@ -145,7 +149,7 @@ public partial class StatusViewModel(
             return;
         _failed = true;
         Active = false;
-        Camera = new("Error...check logs", true);
+        Camera = new("Error", true);
         activity.Stopped(cameraOptions.Value.DevicePath, exception.Message);
         logger.LogError(exception.ToString());
         _stop.Cancel();

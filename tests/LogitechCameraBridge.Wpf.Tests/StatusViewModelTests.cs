@@ -18,8 +18,8 @@ public class StatusViewModelTests
     {
         var f = new Fixture();
         await f.Model.InitializeAsync();
-        Assert.Equal(new DeviceStatus("found: Stub", false), f.Model.Controller);
-        Assert.Equal(new DeviceStatus("found: Camera", false), f.Model.Camera);
+        Assert.Equal(new DeviceStatus("Stub", false), f.Model.Controller);
+        Assert.Equal(new DeviceStatus("Camera", false), f.Model.Camera);
         Assert.True(f.Model.Active);
         Assert.Equal("device-1", f.Options.Value.DevicePath);
         await f.Model.InitializeAsync();
@@ -39,7 +39,7 @@ public class StatusViewModelTests
         if (missingDevice) f.Cameras.Available = [];
         else f.Store.Camera = null;
         await f.Model.InitializeAsync();
-        Assert.Equal(new DeviceStatus("not selected", true), f.Model.Camera);
+        Assert.Equal(new DeviceStatus("Not selected", true), f.Model.Camera);
         Assert.False(f.Model.Active);
         Assert.Equal(0, f.Session.Starts);
         await f.Model.ShutdownAsync();
@@ -50,7 +50,7 @@ public class StatusViewModelTests
     {
         var f = new Fixture(new MissingController());
         await f.Model.InitializeAsync();
-        Assert.Equal(new DeviceStatus("not found", true), f.Model.Controller);
+        Assert.Equal(new DeviceStatus("Not found", true), f.Model.Controller);
         Assert.Single(f.Menu.Cameras);
         Assert.False(f.Model.Active);
         Assert.Equal(0, f.Session.Starts);
@@ -78,7 +78,7 @@ public class StatusViewModelTests
         var f = new Fixture();
         f.Session.StartFailure = new InvalidOperationException("Camera failed");
         await f.Model.InitializeAsync();
-        Assert.Equal(new DeviceStatus("Error...check logs", true), f.Model.Camera);
+        Assert.Equal(new DeviceStatus("Error", true), f.Model.Camera);
         Assert.False(f.Model.Active);
         await f.Model.InitializeAsync();
         Assert.Equal(1, f.Session.Starts);
@@ -94,7 +94,7 @@ public class StatusViewModelTests
         f.Session.Progress!.Report(new(false, "Set failed"));
         await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         Assert.False(f.Model.Active);
-        Assert.Equal(new DeviceStatus("Error...check logs", true), f.Model.Camera);
+        Assert.Equal(new DeviceStatus("Error", true), f.Model.Camera);
         await f.Model.InitializeAsync();
         Assert.Equal(1, f.Session.Starts);
         await f.Model.ShutdownAsync();

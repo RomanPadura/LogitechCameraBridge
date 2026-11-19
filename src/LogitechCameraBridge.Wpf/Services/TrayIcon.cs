@@ -12,8 +12,8 @@ public sealed class TrayIcon : IDisposable
     private readonly ToolStripMenuItem _exitItem = new("Exit");
     private readonly ToolStripMenuItem _camerasItem = new("Cameras");
     private readonly ToolStripMenuItem _statusItem = new("Status");
-    private readonly ToolStripLabel _controllerStatus = new("Controller: checking...");
-    private readonly ToolStripLabel _cameraStatus = new("Camera: checking...");
+    private readonly ToolStripLabel _controllerStatus = new("Logitech Controller: Checking...");
+    private readonly ToolStripLabel _cameraStatus = new("Camera: Checking...");
     private readonly ToolStripLabel _activeStatus = new("Active: false");
     private readonly NotifyIcon _notifyIcon;
     private CameraMenuViewModel? _cameraMenu;
@@ -54,9 +54,9 @@ public sealed class TrayIcon : IDisposable
     {
         if (_isDisposed || _status is null)
             return;
-        _controllerStatus.Text = $"Controller: {_status.Controller.Text}";
+        _controllerStatus.Text = $"Logitech Controller: {_status.Controller.Text.Replace("&", "&&")}";
         _controllerStatus.ForeColor = _status.Controller.IsError ? Color.Red : SystemColors.MenuText;
-        _cameraStatus.Text = $"Camera: {_status.Camera.Text}";
+        _cameraStatus.Text = $"Camera: {_status.Camera.Text.Replace("&", "&&")}";
         _cameraStatus.ForeColor = _status.Camera.IsError ? Color.Red : SystemColors.MenuText;
         _activeStatus.Text = _status.Active ? "Active: true" : "Active: false";
         _activeStatus.ForeColor = _status.Active ? SystemColors.MenuText : Color.Red;
@@ -141,8 +141,8 @@ public sealed class TrayIcon : IDisposable
     public void ShowStartupFailure()
     {
         _notifyIcon.Text = "LogitechCameraBridge - startup failed";
-        _controllerStatus.Text = "Controller: Error...check logs";
-        _cameraStatus.Text = "Camera: Error...check logs";
+        _controllerStatus.Text = "Logitech Controller: Error";
+        _cameraStatus.Text = "Camera: Error";
         _activeStatus.Text = "Active: false";
         _controllerStatus.ForeColor = _cameraStatus.ForeColor = _activeStatus.ForeColor = Color.Red;
     }

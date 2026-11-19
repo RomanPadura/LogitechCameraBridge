@@ -100,7 +100,7 @@ The shared console JSON is linked into WPF output/publish. UseControllerStub sel
 
 StatusViewModel.InitializeAsync is invoked automatically, once per process. It discovers the
 controller, initializes CameraMenuViewModel (loads selection and enumerates cameras off the UI thread),
-and matches the saved exact device identity. Missing/unavailable choice is not selected; no fallback.
+and matches the saved exact device identity. Missing/unavailable choice is Not selected; no fallback.
 Cameras are listed even when the controller is missing. If both are available, it sets DevicePath,
 runs the monitored bridge, and waits for actual readiness before Active: true. Startup sends no
 button reports and performs no movement or video capture. It owns session cancellation and shutdown.
@@ -109,11 +109,11 @@ There is no lazy keyboard startup, retry, reconnection, live switching or menu-t
 Repeated initialization calls return the same startup task. Camera selection only saves a choice
 for the next launch, with a restart notification. The running camera/status stays the startup choice.
 CameraMenuViewModel latches scan/save failures. Initialization/runtime faults make Active false,
-retain Error...check logs, cancel the worker and require restart. App blocks keys unless Active.
+retain Error, cancel the worker and require restart. App blocks keys unless Active.
 
 Status rows are read-only ToolStripLabels with red error/no-selection/inactive text. Controller shows
-found: Stub / found: Logitech / not found / Error...check logs. ControllerNotFoundException derives
-from InvalidOperationException. Camera shows found: <name> / not selected / Error...check logs.
+Stub / <device name> / Not found / Error. ControllerNotFoundException derives
+from InvalidOperationException. Camera shows <camera name> / Not selected / Error.
 Status is updated by startup and worker progress, without continuous hotplug monitoring.
 
 MonitoredBridgeSession/BridgeActivity retain actual readiness and observed worker failures.

@@ -37,7 +37,7 @@ Startup performs one attempt:
 
 1. Find the configured controller and publish its status.
 2. Enumerate cameras and restore the saved choice by its exact device path.
-3. If the saved choice is absent/unavailable, show Camera: not selected without choosing a fallback.
+3. If the saved choice is absent/unavailable, show Camera: Not selected without choosing a fallback.
 4. If both devices are available, initialize controls and open controller input on the worker.
 5. Publish Active: true only after readiness. No keyboard command is required to start.
 
@@ -59,8 +59,8 @@ are preserved; invalid JSON is reported without overwriting it. Failed saves ret
 
 | Row | Values |
 | --- | --- |
-| Controller | found: Stub, found: Logitech, not found, or Error...check logs |
-| Camera | found: <name>, not selected, or Error...check logs |
+| Logitech Controller | Stub, <device name>, Not found, or Error |
+| Camera | <camera name>, Not selected, or Error |
 | Active | true or false |
 
 Missing devices, no selection, errors and Active: false are red. Status updates from initialization
@@ -94,7 +94,7 @@ Manual check:
 1. Start with a saved available camera; inspect Status without pressing simulator keys.
 2. Expect Active: true after successful initialization, or an explicit device/error status.
 3. Save a different camera, exit and restart; confirm the new startup camera is used.
-4. Start with an unavailable saved camera: expect not selected and Active: false.
+4. Start with an unavailable saved camera: expect Not selected and Active: false.
 5. After a startup/runtime error, check logs and restart. Menus/keys must not cause a retry.
 6. Exit during startup/processing; confirm the process and icon disappear cleanly.
 
