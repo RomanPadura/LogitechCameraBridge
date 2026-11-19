@@ -29,7 +29,7 @@ public sealed class KeyboardSimulator(
             SimulatorButton.Down => options.TiltDownCode,
             _ => throw new ArgumentOutOfRangeException(nameof(button))
         };
-        if (!stub.TryPressButton(ParseByte(options.ReportId), ParseByte(code)))
+        if (!stub.TryTapButton(ParseByte(options.ReportId), ParseByte(code)))
             throw new InvalidOperationException("Controller input is unavailable. Restart the application.");
         return Task.CompletedTask;
     }

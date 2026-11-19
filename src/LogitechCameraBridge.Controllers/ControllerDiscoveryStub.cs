@@ -11,15 +11,26 @@ public sealed class ControllerDiscoveryStub(ICameraBridgeLogger logger) : IContr
     private readonly HashSet<StubHidStream> _streams = [];
 
     public bool TryPressButton(byte reportId, byte buttonCode)
+        => SubmitReports(reportId, [buttonCode]);
+
+    // Enqueue both reports together: a full queue must never leave a simulated button held.
+    public bool TryTapButton(byte reportId, byte buttonCode)
+        => SubmitReports(reportId, [buttonCode, 0x00]);
+
+    private bool SubmitReports(byte reportId, byte[] codes)
     {
-        byte[] report = new byte[13];
-        report[0] = reportId;
-        report[1] = buttonCode;
+        var reports = codes.Select(code =>
+        {
+            byte[] report = new byte[13];
+            report[0] = reportId;
+            report[1] = code;
+            return report;
+        }).ToArray();
         lock (_streamsGate)
         {
             bool accepted = false;
             foreach (var stream in _streams)
-                accepted |= stream.TryEnqueue(report);
+                accepted |= stream.TryEnqueue(reports);
             return accepted;
         }
     }
@@ -70,13 +81,14 @@ public sealed class ControllerDiscoveryStub(ICameraBridgeLogger logger) : IContr
         private int _writeTimeout;
         private readonly Queue<byte[]> _reports = new();
 
-        public bool TryEnqueue(byte[] report)
+        public bool TryEnqueue(byte[][] reports)
         {
             lock (_gate)
             {
-                if (_disposed || _reports.Count >= 32)
+                if (_disposed || _reports.Count + reports.Length > 32)
                     return false;
-                _reports.Enqueue(report);
+                foreach (var report in reports)
+                    _reports.Enqueue(report);
                 Monitor.PulseAll(_gate);
                 return true;
             }

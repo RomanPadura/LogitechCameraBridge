@@ -168,7 +168,9 @@ public class CameraBridgeManager(
         // Open the controller HID stream.
         using var stream = speakerphone.Open();
 
-        stream.ReadTimeout = 1000;
+        stream.ReadTimeout = 50;
+
+        var buttons = new ControllerButtonRepeater(buttonMappings, controls.Move);
 
         _logger.LogInfo("Listening for controller buttons...");
         _logger.LogInfo($"Report ID: 0x{reportId:X2}");
@@ -189,6 +191,8 @@ public class CameraBridgeManager(
             }
             catch (TimeoutException)
             {
+                if (!cancellationToken.IsCancellationRequested)
+                    buttons.Tick(Environment.TickCount64);
                 continue;
             }
 
@@ -204,12 +208,9 @@ public class CameraBridgeManager(
 
             byte buttonCode = report[1];
 
-            // Ignore button release and unknown reports.
-            if (buttonCode is 0x00 or 0xFF)
-                continue;
-
-            if (buttonMappings.TryGetValue(buttonCode, out var command))
-                controls.Move(command.Property, command.Direction);
+            buttons.Handle(buttonCode, Environment.TickCount64);
+            if (!cancellationToken.IsCancellationRequested)
+                buttons.Tick(Environment.TickCount64);
         }
     }
 

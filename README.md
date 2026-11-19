@@ -16,6 +16,11 @@ All button codes are hexadecimal strings in `BridgeControllerDevice`.
 Set `Logger.LogToConsole` to `true` to see discovery, ranges, reports, and errors.
 Restart the app after configuration changes.
 
+Camera USB selection is defined only in the console's `Program.cs` (Logitech C930e:
+VID `0x046D`, PID `0x0843`, interface `MI_00`). Change those console defaults there
+when using another USB camera. The shared JSON has no `CameraToControl` section;
+the tray app uses the camera selected through its menu.
+
 `UseControllerStub` is a root-level JSON option, currently set to `true`. Both hosts register
 `ControllerDiscoveryStub` as `IControllerDiscovery` when enabled; `false` or a missing option
 registers the physical `ControllerDiscovery`. Set it to `false` before testing GROUP buttons.
@@ -33,6 +38,11 @@ dotnet run --project src/LogitechCameraBridge.Wpf
 
 The app uses .NET 10 WPF, MVVM, DI and the shared console appSettings.json. It has no startup
 window or taskbar button. Its tray menu contains Status, Camera controls, Cameras, About, Restart and Exit.
+
+The notification-area icon uses the Windows Shell API with a hidden message window;
+all menus use WPF controls. There is no WinForms dependency. The icon is restored
+automatically after Windows Explorer restarts, and removed when the app exits.
+Both left-click and right-click on the tray icon open the same menu; keyboard activation also works.
 
 Startup performs one attempt:
 
@@ -119,7 +129,8 @@ Press the prefix first. Z/P are Windows virtual keys (same key positions in non-
 Shifted main + is supported. The keyboard hook recognizes global chords only in stub mode and
 logs no text. Z/P and ordinary keys pass through; action keys, repeats and releases are consumed.
 Ctrl/Alt/Windows modifiers, both prefixes held, or injected input do not generate commands.
-One press submits one configured report without auto-repeat. Keys never start/restart/switch the bridge.
+One press submits a configured press report followed by release, without keyboard auto-repeat.
+Keys never start/restart/switch the bridge.
 Use a preview window to observe actual movement. Do not run console and WPF bridges simultaneously.
 
 Restart and Exit remove the hook, cancel startup/processing, await HID/COM cleanup and pending
@@ -159,8 +170,17 @@ The app queries Min, Max, Step, Default, Current, and manual-control capabilitie
 Values are limited to the reported ranges. Commands at a limit do not call `Set` again.
 Unavailable Pan/Tilt axes are logged and skipped, so Zoom can continue working.
 Driver errors are logged. The console continues processing; the WPF host stops and requires Restart.
-Release (0x00), unknown (0xFF), Far End, presets, and unmapped codes do not change the camera.
-There is no application-generated button hold/repeat behavior yet.
+Hold a physical Zoom/Pan/Tilt button to keep moving: one immediate driver step, a 400 ms
+initial delay, then one step every 100 ms. Release (`0x00`) stops the movement. Duplicate
+press reports do not accelerate it. Movement also stops at a limit or on a driver failure;
+press again after release to try again. Unmapped codes cancel the current hold; `0xFF` is ignored.
+Disconnecting the controller or shutting down the bridge stops the worker and its repeats.
+
+Far End (`0x40`) and presets do not move the camera. Far End reset is deferred.
+
+To verify on the physical controller: hold Zoom In for one second, release and confirm it
+stops; repeat for Zoom Out and the directional buttons.
+Keyboard simulation remains one step per chord; it does not emulate physical holding.
 
 ## Hardware verification
 

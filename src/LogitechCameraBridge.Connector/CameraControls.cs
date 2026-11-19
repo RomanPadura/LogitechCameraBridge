@@ -34,7 +34,7 @@ internal sealed class CameraControls(IAMCameraControl camera, ICameraBridgeLogge
             ExceptionDispatchInfo.Capture(zoomFailure).Throw();
     }
 
-    public void Move(CameraControlProperty property, int direction)
+    public bool Move(CameraControlProperty property, int direction)
     {
         if (direction is not (-1 or 1))
             throw new ArgumentOutOfRangeException(nameof(direction));
@@ -42,7 +42,7 @@ internal sealed class CameraControls(IAMCameraControl camera, ICameraBridgeLogge
         if (!_ranges.TryGetValue(property, out var range))
         {
             logger.LogInfo($"{property} is unavailable; ignoring button.");
-            return;
+            return false;
         }
 
         try
@@ -55,19 +55,21 @@ internal sealed class CameraControls(IAMCameraControl camera, ICameraBridgeLogge
             {
                 PublishValue(property, new(current, range.Min, range.Max));
                 logger.LogInfo($"{property} limit reached: {current}");
-                return;
+                return false;
             }
 
             CheckResult(camera.Set(property, next, CameraControlFlags.Manual), property, "Set");
             CheckResult(camera.Get(property, out int actual, out _), property, "Get");
             PublishValue(property, new(actual, range.Min, range.Max));
             logger.LogInfo($"{property}: {current} -> {actual}");
+            return actual != current;
         }
         catch (COMException ex)
         {
             PublishValue(property, null);
             // A driver error on one axis must not stop processing other controls.
             logger.LogError(ex.ToString());
+            return false;
         }
     }
 

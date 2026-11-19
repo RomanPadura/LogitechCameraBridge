@@ -7,9 +7,11 @@
 - Logitech C930e: VID 0x046D, PID 0x0843, USB interface MI_00.
 - Known HID reports are 13 bytes: report ID 0x0A at byte 0, button code at byte 1.
 - Zoom In/Out: 0x10/0x20. Left/Right: 0x08/0x04. Up/Down: 0x01/0x02.
-- Far End: 0x40, currently ignored. Presets 1/2/3 are outside the project scope.
-- Codes 0x00 and 0xFF are always ignored. The user also observed them when toggling the microphone;
-  the exact meaning of 0xFF is not established.
+- Far End: 0x40, not implemented. The user explicitly deferred reset: remember that a future
+  Far End reset should restore camera driver factory/default values, not startup position or
+  a user-saved preset. Do not implement it until requested. Presets 1/2/3 remain out of scope.
+- The user's supplied mapping identifies 0x00 as release (stops repeat); 0xFF remains ignored.
+  Physical hold/release acceptance still needs testing on the actual controller.
 
 ## Current structure
 
@@ -77,6 +79,12 @@ binding without USB identity assumptions or fallback. The manager bypasses USB c
 the path is supplied; console USB selection is preserved otherwise. COM binding/release stays on the
 bridge worker. Missing selection/camera and unsupported camera controls are reported, not simulated.
 
+Camera USB identity values now live only in the console Program.cs options registration
+(VID 0x046D, PID 0x0843, interface MI_00 with prefix MI_). The shared appSettings.json
+has no CameraToControl section. WPF registers empty CameraToControlOptions and fills
+DevicePath from its saved menu selection; it does not bind USB defaults from JSON.
+The unused Device display-name option was removed.
+
 ## Pan/Tilt implementation
 
 Button codes are configured in `BridgeControllerDevice`; all six codes must be distinct bytes excluding 0x00/0xFF.
@@ -86,7 +94,14 @@ On each supported button report, read the current property, add or subtract one 
 clamp to Min/Max, and call `Set` with `CameraControlFlags.Manual` if the value changes.
 Every control HRESULT is checked. Failures are logged: console continues processing; WPF cancels the session and requires restart.
 Right/Up initially increase values; Left/Down decrease them. Physical image directions are pending verification.
-No reset, hold/repeat, automatic zoom adjustment, reconnection, or WPF window is implemented yet.
+`ControllerButtonRepeater` performs a step on press, then repeats after 400 ms at 100 ms
+intervals while held. Duplicate codes are ignored until release/direction change, 0x00 stops,
+0xFF is ignored, and an unmapped code cancels holding. Limit/no movement/COM failure stops
+repeat until a new press. HID reads time out every 50 ms so the same worker can run repeat
+ticks; no camera timer or extra COM thread is created. Read failures/disconnect exit the loop.
+Far End has no reset action; factory/default reset is only a remembered future request.
+Keyboard simulation uses an atomic press/release pair to preserve one-step chord behavior.
+No automatic zoom adjustment, reconnection, or WPF window is implemented yet.
 
 ## WPF lifecycle foundation
 
@@ -105,7 +120,8 @@ runtime errors to the ViewModel. The original JSON file is linked into the WPF o
 
 ## Tray application: one startup attempt
 
-App creates no startup window/taskbar button. NotifyIcon exposes Status, Camera controls, Cameras, Restart and Exit.
+App creates no startup window/taskbar button. Native Shell_NotifyIcon with WPF menus exposes
+Status, Camera controls, Cameras, About, Restart and Exit.
 The shared console JSON is linked into WPF output/publish. UseControllerStub selects stub/physical DI.
 
 StatusViewModel.InitializeAsync is invoked automatically, once per process. It discovers the
@@ -121,7 +137,7 @@ and requests an application restart after a successful save. Failed saves never 
 CameraMenuViewModel latches scan/save failures. Initialization/runtime faults make Active false,
 retain Error, cancel the worker and require restart. App blocks keys unless Active.
 
-Status rows are read-only ToolStripLabels with red error/no-selection/inactive text. Controller shows
+Status rows are WPF TextBlocks in disabled MenuItems, with red error/no-selection/inactive text. Controller shows
 Stub / <device name> / Not found / Error. ControllerNotFoundException derives
 from InvalidOperationException. Camera shows <camera name> / Not selected / Error.
 Status is updated by startup and worker progress, without continuous hotplug monitoring.
@@ -143,8 +159,10 @@ end-to-end acceptance of published Velopack updates, and prior physical-controll
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 39 connector/logger/stub and 66 WPF tests
-passed (105 total). Self-contained win-x64 publish and Velopack installer/feed packaging also pass.
+Latest automated checks: build without warnings/errors; 49 connector/logger/stub and 75 WPF tests
+passed (124 total), including hold/release timing, ignored Far End input, driver failures,
+atomic simulated taps, native tray lifecycle and WPF menu actions/layout.
+Prior self-contained win-x64 publish and Velopack installer/feed packaging checks also passed.
 Added capability checks distinguish unsupported driver responses from generic
 failures, validate manual support/ranges/current values without Set, publish all axes before required
 Zoom failure, update values after movement/at limits, remove failed current reads, and forward typed
@@ -181,11 +199,20 @@ retains actual device identities. No new hardware acceptance is implied by the R
 
 ### Status tray icon
 
+The green Healthy artwork is also exported to Assets/LogitechCameraBridge.ico
+(16/20/24/32/48/64/128/256 px) using tools/GenerateAppIcon, which links the tray
+renderer and embedded Fluent SVG. The WPF ApplicationIcon and release workflow
+--icon use this file for the executable, Setup/Update and Installed Apps artwork.
+Local publish/pack verification found setup.ico in the full package and confirmed
+the green native icon embedded in both the app executable and Setup.exe.
+The installed-app icon stays green; only the notification-area icon changes with status.
+
 The Microsoft Fluent camera_24_filled SVG is embedded as FluentCamera.svg; its MIT license and
 source attribution are under Assets. The license is copied into output/publish. TrayStatusIcon
 renders the frozen path with a light disk and colored ring at the current system small-icon size.
-Temporary HICONs are destroyed after cloning; four owned icon variants are cached for the tray
-lifetime, switched only when the state changes, and disposed after NotifyIcon disposal.
+WPF PNG encoding and CreateIconFromResourceEx create the HICONs without System.Drawing.
+Four SafeIconHandle variants are cached for the tray lifetime and destroyed after the native
+notification registration has been deleted. There is no WinForms framework reference.
 Green means confirmed readiness; red means error; orange means only the camera selection is
 unavailable while the controller was found. Errors take priority. Gray is reserved for initialization.
 StatusViewModel exposes typed TrayState with property notifications rather than deriving colors
@@ -194,6 +221,22 @@ Tooltips identify the state without relying only on color. Rendering tests expor
 TestResults/tray-icons-preview.png without starting the application or accessing devices.
 
 ## Hardware test status
+
+### Native tray and WPF menus
+
+NotificationAreaIcon owns a hidden top-level HwndSource (not a message-only window),
+registers Shell_NotifyIcon version 4, routes right-click (WM_CONTEXTMENU), left-click
+(NIN_SELECT), and keyboard (NIN_KEYSELECT) callbacks to the same menu, and listens
+for TaskbarCreated to re-add the current icon after Explorer restarts. Failed registration
+retries on a dispatcher timer; Dispose stops retries, deletes the icon and destroys the HWND.
+Context menus use the icon rectangle for positioning, foreground activation before showing,
+and NIM_SETFOCUS after dismissal. WPF TextBlock headers preserve literal underscores and
+ampersands in camera names. Informational rows are disabled MenuItems with explicit text colors.
+INotificationAreaIcon separates native Shell calls from the WPF menu for hardware-free tests.
+Tests send native window messages with a recording Shell backend to verify registration,
+recovery, callback versions, notifications and cleanup. WPF popup tests check author text at
+12/18/24 DIP font sizes; TestResults/wpf-about-menu-preview.png was visually inspected.
+Actual Explorer restart and tray interaction across monitor DPI settings remain manual checks.
 
 ### About submenu
 

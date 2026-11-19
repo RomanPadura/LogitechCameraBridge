@@ -24,8 +24,8 @@ public class TrayStatusIconTests
                 foreach (int size in new[] { 16, 32 })
                 {
                     using var icon = TrayStatusIcon.Create(states[index], size);
-                    Assert.Equal(size, icon.Width);
-                    Assert.NotEqual(IntPtr.Zero, icon.Handle);
+                    Assert.Equal(size, icon.Size);
+                    Assert.NotEqual(IntPtr.Zero, icon.DangerousGetHandle());
                     var bitmap = TrayStatusIcon.Render(states[index], size);
                     byte[] pixels = new byte[size * size * 4];
                     bitmap.CopyPixels(pixels, size * 4, 0);
