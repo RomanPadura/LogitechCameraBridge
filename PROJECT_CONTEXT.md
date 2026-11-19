@@ -210,7 +210,10 @@ and prevents the completed check from applying an update. Repeated update clicks
 A custom STA Main runs the Velopack bootstrap before WPF initializes. Public releases need no
 client credentials; optional private access uses LOGITECH_CAMERA_BRIDGE_GITHUB_TOKEN from the
 process/user environment. Tokens and request exceptions are not logged.
-The release workflow builds/tests on v* pushes, publishes self-contained win-x64 output,
+The release workflow builds/tests on v* pushes, publishes framework-dependent win-x64 output
+with --self-contained false and declares --framework net10.0-x64-desktop during packaging.
+Setup can install the Desktop Runtime when missing; this can require a prompt during initial
+installation or an update. Portable users must install the Desktop Runtime separately. The workflow
 downloads the previous stable package for deltas, packs and uploads with the built-in GitHub
 token. Prerelease tags create prereleases ignored by the client. See docs/UPDATES.md.
 AppUpdaterTests cover no-install/no-update, downloading, download failure and cancellation.

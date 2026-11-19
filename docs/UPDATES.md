@@ -4,8 +4,9 @@ The WPF tray application checks `https://github.com/RomanPadura/LogitechCameraBr
 only when the user selects **About > Check for updates...**. It downloads a newer
 stable release, releases the camera/controller, flushes logs, launches the silent
 updater and exits. Velopack replaces the installed files and restarts the app.
-No update confirmation or installer window is shown. Checks and downloads that
-fail leave the running bridge in place; retry the menu action later.
+App updates are silent when the required .NET Desktop Runtime is already installed.
+If it is missing, Velopack may prompt to install it before applying an update.
+Checks and downloads that fail leave the running bridge in place; retry the menu action later.
 
 This updates the installed tray app on the user's Windows machine (including a
 Windows server running it in an interactive user session). It does not deploy a
@@ -50,7 +51,7 @@ the app version and the Velopack package version; you do not edit the project ve
 Open **Actions > Package release with Velopack** and wait for success. The workflow:
 
 1. Builds and tests the solution using .NET 10.
-2. Publishes a self-contained Windows x64 tray app.
+2. Publishes a Windows x64 tray app without bundling .NET.
 3. Installs `vpk` 1.2.161, matching the app's Velopack dependency.
 4. Downloads the previous stable package when a Velopack feed exists.
 5. Builds Setup.exe, the portable archive, full package, delta when possible, and feed.
@@ -61,7 +62,22 @@ The first Velopack release needs no previous package. Keep the package ID
 `LogitechCameraBridge` and the default `win` channel unchanged in future
 releases. All packages are explicitly built for `win-x64`.
 
+The publish command uses `--self-contained false`; packaging specifies
+`--framework net10.0-x64-desktop`. Both settings must stay together so Setup.exe
+knows which runtime the app requires.
+
 ## 4. Install once on each machine
+
+The application requires **.NET 10 Desktop Runtime for Windows x64**.
+Setup.exe checks for this dependency and can download/install it when missing.
+An internet connection and approval of any runtime installation prompts are required
+when installing the dependency. If it is already installed, no download is needed.
+
+For manual installation or portable ZIP users, open the
+[Microsoft .NET 10 downloads page](https://dotnet.microsoft.com/en-us/download/dotnet/10.0),
+choose **.NET Desktop Runtime > Windows > x64**, install it, then launch the app.
+The plain .NET Runtime alone does not include WPF/Windows Forms. The portable ZIP
+does not include the runtime; install the Desktop Runtime before launching it.
 
 Open the repository's **Releases** page and download
 `LogitechCameraBridge-win-Setup.exe` from `v1.0.0`.
@@ -105,7 +121,8 @@ it as a GitHub prerelease; the tray updater ignores prereleases.
 1. Keep the installed `v1.0.0` running while `v1.0.1` finishes publishing.
 2. Right-click the tray icon and choose **About > Check for updates...**.
 3. The menu action becomes disabled while checking/downloading. The bridge keeps
-   running during download, then exits and restarts after silent installation.
+   running during download, then exits and restarts after silent installation
+   (a missing runtime can require a separate installation prompt).
 4. Reopen **About** and verify the version is `1.0.1`.
 5. Check that the selected camera is retained and the controller reconnects.
 6. Check again: the app should report that it is already current.

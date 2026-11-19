@@ -211,6 +211,10 @@ See [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) for implementation details and test
 DirectShow API reference: [IAMCameraControl](https://learn.microsoft.com/en-us/windows/win32/api/strmif/nn-strmif-iamcameracontrol).
 ## Application updates
 
+Release packages require **.NET 10 Desktop Runtime for Windows x64**. Setup.exe
+can download/install it when missing. For portable ZIP use, install it first from
+[Microsoft's .NET 10 downloads](https://dotnet.microsoft.com/en-us/download/dotnet/10.0).
+
 The tray app supports Velopack updates from GitHub Releases through **About > Check
 for updates...**. See [the step-by-step release and update guide](docs/UPDATES.md)
 for repository visibility, first installation, version tags and silent updates.
