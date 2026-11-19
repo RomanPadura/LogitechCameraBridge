@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/LogitechCameraBridge.Wpf/Services/TrayStatusIcon.cs" Link="TrayStatusIcon.cs" />
+    <Compile Include="../../src/LogitechCameraBridge.Wpf/Services/SafeIconHandle.cs" Link="SafeIconHandle.cs" />
+    <Compile Include="../../src/LogitechCameraBridge.Wpf/Models/TrayIconState.cs" Link="TrayIconState.cs" />
+    <EmbeddedResource Include="../../src/LogitechCameraBridge.Wpf/Assets/FluentCamera.svg"
+                      LogicalName="LogitechCameraBridge.Wpf.Assets.FluentCamera.svg" />
+  </ItemGroup>
+</Project>

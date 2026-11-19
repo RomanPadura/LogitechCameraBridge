@@ -66,6 +66,12 @@ The publish command uses `--self-contained false`; packaging specifies
 `--framework net10.0-x64-desktop`. Both settings must stay together so Setup.exe
 knows which runtime the app requires.
 
+The app's `ApplicationIcon` and Velopack's `--icon` both use
+`src/LogitechCameraBridge.Wpf/Assets/LogitechCameraBridge.ico`: the existing green
+camera artwork, exported at multiple sizes. This supplies the executable,
+installer and Windows Installed Apps icon. See Assets/README.md for regeneration.
+Publish a new release and install/update to that build to deploy icon changes.
+
 ## 4. Install once on each machine
 
 The application requires **.NET 10 Desktop Runtime for Windows x64**.

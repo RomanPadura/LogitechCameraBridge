@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <StartupObject>LogitechCameraBridge.Wpf.App</StartupObject>
+    <ApplicationIcon>Assets\LogitechCameraBridge.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="LogitechCameraBridge.Wpf.Tests" />

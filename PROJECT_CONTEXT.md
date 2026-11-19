@@ -199,6 +199,14 @@ retains actual device identities. No new hardware acceptance is implied by the R
 
 ### Status tray icon
 
+The green Healthy artwork is also exported to Assets/LogitechCameraBridge.ico
+(16/20/24/32/48/64/128/256 px) using tools/GenerateAppIcon, which links the tray
+renderer and embedded Fluent SVG. The WPF ApplicationIcon and release workflow
+--icon use this file for the executable, Setup/Update and Installed Apps artwork.
+Local publish/pack verification found setup.ico in the full package and confirmed
+the green native icon embedded in both the app executable and Setup.exe.
+The installed-app icon stays green; only the notification-area icon changes with status.
+
 The Microsoft Fluent camera_24_filled SVG is embedded as FluentCamera.svg; its MIT license and
 source attribution are under Assets. The license is copied into output/publish. TrayStatusIcon
 renders the frozen path with a light disk and colored ring at the current system small-icon size.
