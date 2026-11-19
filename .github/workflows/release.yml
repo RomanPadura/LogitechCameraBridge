@@ -1,0 +1,83 @@
+name: Package release with Velopack
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: velopack-release
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Validate release version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ($env:RELEASE_TAG -cnotmatch '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$') {
+            throw 'Use a release tag such as v1.0.0 or v1.1.0-beta.1.'
+          }
+          "APP_VERSION=$($env:RELEASE_TAG.Substring(1))" >> $env:GITHUB_ENV
+          "IS_PRERELEASE=$($env:RELEASE_TAG.Contains('-').ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
+
+      - name: Build and test
+        run: |
+          dotnet test LogitechCameraBridgeSln.sln -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish self-contained Windows app
+        run: |
+          dotnet publish src/LogitechCameraBridge.Wpf/LogitechCameraBridge.Wpf.csproj -c Release -r win-x64 --self-contained true -p:Version=$env:APP_VERSION -o artifacts/publish
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install matching Velopack CLI
+        run: dotnet tool install vpk --tool-path artifacts/tools --version 1.2.161
+
+      # No previous release is a normal first-release condition. Other API failures must fail the job.
+      - name: Download previous stable release for delta packaging
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $releases = gh api "repos/$env:GH_REPO/releases?per_page=100" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot list previous releases.' }
+          $previous = @($releases | Where-Object { !$_.draft -and !$_.prerelease })
+          if ($previous.Count -eq 0 -or !($previous[0].assets | Where-Object name -eq 'releases.win.json')) {
+            Write-Host 'No previous Velopack feed: building a full package without a delta base.'
+          } else {
+            artifacts/tools/vpk.exe download github --repoUrl "https://github.com/$env:GH_REPO" --token $env:GH_TOKEN --outputDir artifacts/releases
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Create installer and update feed
+        run: |
+          artifacts/tools/vpk.exe pack --packId RomanPadura.LogitechCameraBridge --packVersion $env:APP_VERSION --packDir artifacts/publish --mainExe LogitechCameraBridge.Wpf.exe --packTitle "Logitech Camera Bridge" --runtime win-x64 --outputDir artifacts/releases
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish GitHub release and Velopack assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $extra = @()
+          if ($env:IS_PRERELEASE -eq 'true') { $extra += '--pre' }
+          artifacts/tools/vpk.exe upload github --repoUrl "https://github.com/$env:GH_REPO" --token $env:GH_TOKEN --outputDir artifacts/releases --publish --merge --releaseName "Logitech Camera Bridge $env:APP_VERSION" --tag $env:RELEASE_TAG @extra
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

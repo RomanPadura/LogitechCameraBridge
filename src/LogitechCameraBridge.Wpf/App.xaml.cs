@@ -7,11 +7,24 @@ using LogitechCameraBridge.Wpf.Services;
 using LogitechCameraBridge.Wpf.ViewModels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Velopack;
 
 namespace LogitechCameraBridge.Wpf;
 
 public partial class App : System.Windows.Application
 {
+    private readonly CancellationTokenSource _updateCancellation = new();
+    private bool _isUpdating;
+
+    [STAThread]
+    private static void Main(string[] args)
+    {
+        VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+        var app = new App();
+        app.InitializeComponent();
+        app.Run();
+    }
+
     private TrayIcon? _trayIcon;
     private IConfigurationRoot? _configuration;
     private ServiceProvider? _services;
@@ -39,6 +52,7 @@ public partial class App : System.Windows.Application
         _trayIcon = new TrayIcon(new AboutViewModel());
         _trayIcon.ExitRequested += OnExitRequested;
         _trayIcon.RestartRequested += OnRestartRequested;
+        _trayIcon.UpdateRequested += OnUpdateRequested;
 
         try
         {
@@ -102,12 +116,46 @@ public partial class App : System.Windows.Application
 
     private async void OnRestartRequested(object? sender, EventArgs e) => await ShutdownApplicationAsync(restart: true);
 
-    private async Task ShutdownApplicationAsync(bool restart)
+    private async void OnUpdateRequested(object? sender, EventArgs e)
+    {
+        if (_isExiting || _isUpdating)
+            return;
+        _isUpdating = true;
+        _trayIcon?.SetUpdating(true);
+        try
+        {
+            var applyUpdate = await new AppUpdater().DownloadUpdateAsync(_updateCancellation.Token);
+            if (_isExiting)
+                return;
+            if (applyUpdate is null)
+                _trayIcon?.ShowUpdateMessage("You are running the latest version.");
+            else
+                await ShutdownApplicationAsync(restart: false, applyUpdate: applyUpdate);
+        }
+        catch (OperationCanceledException) when (_updateCancellation.IsCancellationRequested) { }
+        catch (Exception)
+        {
+            // Authentication/network exceptions can contain request details; never log credentials.
+            if (!_isExiting)
+                _trayIcon?.ShowError("Update failed. Check your connection, release assets and repository access. " +
+                    "For a private repository, configure LOGITECH_CAMERA_BRIDGE_GITHUB_TOKEN. " +
+                    "Updates require installation using the release Setup.exe.");
+        }
+        finally
+        {
+            _isUpdating = false;
+            if (!_isExiting)
+                _trayIcon?.SetUpdating(false);
+        }
+    }
+
+    private async Task ShutdownApplicationAsync(bool restart, Action? applyUpdate = null)
     {
         if (_isExiting)
             return;
 
         _isExiting = true;
+        _updateCancellation.Cancel();
         _hotkeys?.Dispose();
         _hotkeys = null;
         _trayIcon?.DisableExit();
@@ -126,6 +174,7 @@ public partial class App : System.Windows.Application
             // Cleanup and settings writes have completed. The child waits for this process to exit.
             if (restart)
                 AppRestart.StartReplacement();
+            applyUpdate?.Invoke();
         }
         catch (Exception ex)
         {
@@ -152,6 +201,7 @@ public partial class App : System.Windows.Application
         {
             _trayIcon.ExitRequested -= OnExitRequested;
             _trayIcon.RestartRequested -= OnRestartRequested;
+            _trayIcon.UpdateRequested -= OnUpdateRequested;
             _trayIcon.Dispose();
         }
         _services?.Dispose();
