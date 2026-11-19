@@ -20,8 +20,8 @@
 - Connector: `ICameraBridgeManager`, HID command dispatch and camera control processing.
 - Console app: JSON configuration, DI registrations, Ctrl+C handling.
 - Connector.Tests: simulated camera-control tests; no physical hardware access.
-- Wpf: .NET 10 Windows library foundation with CommunityToolkit.Mvvm, DI/options, a dedicated
-  MTA worker and MainViewModel. Window appearance is awaiting user direction; no executable window yet.
+- Wpf: .NET 10 Windows tray executable with CommunityToolkit.Mvvm, DI/options, a dedicated
+  MTA worker and MainViewModel. The current tray shell exposes only Exit and does not start the bridge.
 - Wpf.Tests: worker cancellation/cleanup, overlap protection, failure/retry, and ViewModel
   readiness/error/shutdown tests on a WPF dispatcher; no hardware access.
 
@@ -56,9 +56,32 @@ notifications, prevents overlapping starts, and waits for cancellation during St
 `UiCameraBridgeLogger` forwards logging to the existing options-controlled logger and exposes
 runtime errors to the ViewModel. The original JSON file is linked into the WPF output.
 
-Pending: executable App/window, window-close integration, configuration startup-error display,
-service disposal and logger flushing on exit, visual checks, and hardware lifecycle verification.
-The user is specifying the window design before that work continues.
+## Tray application: step 1
+
+The user specified a tray-only application: no startup window and no regular taskbar button.
+`App.xaml` uses `OnExplicitShutdown` without a StartupUri. `TrayIcon` uses Windows Forms
+`NotifyIcon` with a standard application icon, the LogitechCameraBridge tooltip, and only Exit.
+Windows Forms support is enabled for this notification-area component; the host remains WPF.
+No Window is constructed. Exit disables repeat requests, awaits ViewModel shutdown and logger
+flush, calls WPF Shutdown, and disposes the icon/menu/icon resource, DI provider and configuration.
+Configuration failures leave the tray shell available with a startup-failed tooltip and Exit.
+
+The original console JSON remains the single source file, linked into WPF output/publish.
+The tray shell deliberately does not start the bridge or access devices in this step.
+
+Planned separate steps (the user will verify and commit each step):
+
+1. Tray shell and Exit (implemented).
+2. Bridge startup and Status submenu with exactly one current status: Active, Controller not found,
+   Camera not found, or Unknown error. Confirm readiness instead of reporting a requested start as Active.
+3. Cameras submenu listing available cameras, selection, and persistence across restarts.
+   Inspect/extend discovery for this step; no camera picker is implemented yet.
+4. About and Update (update behavior still needs to be specified).
+
+Pending: visual tray/Exit verification, automatic bridge startup, typed UI status classification,
+camera discovery/selection persistence, About/Update, and hardware lifecycle verification.
+Computer Use inventory did not expose the Windows taskbar/notification area as a targetable window,
+so the tray icon/menu/Exit behavior could not be visually verified in this session.
 
 Latest automated verification: solution build succeeded with zero warnings/errors; 24 connector/logger
 tests and 6 WPF foundation tests passed. Build/test required execution outside sandbox restrictions.

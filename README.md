@@ -15,20 +15,45 @@ All button codes are hexadecimal strings in `BridgeControllerDevice`.
 Set `Logger.LogToConsole` to `true` to see discovery, ranges, reports, and errors.
 Restart the app after configuration changes.
 
-## WPF foundation (in progress)
+## WPF tray app (step 1)
 
 `src/LogitechCameraBridge.Wpf` targets `net10.0-windows` and uses CommunityToolkit.Mvvm,
 DI and options from the same linked `LogitechCameraBridgeConsole/appSettings.json`.
-The project currently builds as a library while the window design is being specified;
-there is no executable WPF window or WPF launch command yet.
+Run it from the VS Code PowerShell terminal:
+
+```powershell
+dotnet run --project src/LogitechCameraBridge.Wpf
+```
+
+The app creates no startup window or taskbar button. Find the standard application icon
+in the Windows notification area (possibly under **Show hidden icons**). Hover over it to
+identify `LogitechCameraBridge`, then right-click and choose **Exit**. This step implements
+only the tray shell: it does not start the bridge or access HID/camera hardware.
+Exit flushes queued logs, disposes services and removes the tray icon before the process ends.
+If configuration startup fails, the tooltip says `LogitechCameraBridge - startup failed`;
+Exit remains available and no error window is shown.
 
 The foundation includes a dedicated MTA bridge worker, cancellation, overlapping-run protection,
 and a ViewModel with Start/Stop commands, readiness status and error reporting.
 Running status requires camera initialization and an open HID stream; it is not inferred from
 the requested start operation. It is a startup readiness signal, not continuous connection monitoring.
-Stop and `ShutdownAsync` wait for the worker to release device resources. Window-close integration
-and application startup/shutdown (including logger flush) remain to be connected with the window.
-Do not run the console host and the future WPF host simultaneously during hardware tests.
+Stop and `ShutdownAsync` wait for the worker to release device resources. Exit calls `ShutdownAsync`
+before disposing application services; automatic bridge startup is reserved for a later step.
+Do not run the console host and a bridge-enabled WPF host simultaneously during hardware tests.
+
+Manual tray check:
+
+1. Run the command and verify that no window or application taskbar button appears.
+2. Locate the tray icon and verify that its context menu contains only **Exit**.
+3. Choose **Exit** and confirm that the icon disappears and `dotnet run` returns to the prompt.
+4. Repeat the launch/exit cycle to check for leftover icons or processes.
+
+Subsequent steps will add bridge startup and a **Status** submenu with one current value
+(`Active`, `Controller not found`, `Camera not found`, or `Unknown error`), then a **Cameras**
+selection menu that remembers the choice, followed by **About** and **Update**.
+Each step is kept separate for user verification and a user-created commit.
+
+## Controller commands
 
 | Button | Configuration | Default code | Action |
 | --- | --- | --- | --- |
