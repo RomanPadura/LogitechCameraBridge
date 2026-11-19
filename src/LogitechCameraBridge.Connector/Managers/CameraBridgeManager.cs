@@ -31,13 +31,48 @@ public class CameraBridgeManager(
         cameraOptions.Value;
 
     public void Start(CancellationToken cancellationToken = default)
+        => Start(cancellationToken, static () => { });
+
+    public void Start(CancellationToken cancellationToken, Action onReady)
+        => Start(cancellationToken, onReady, static _ => { });
+
+    public void Start(CancellationToken cancellationToken, Action onReady, Action<CameraControlCapabilities> onCapabilities)
     {
+        ArgumentNullException.ThrowIfNull(onReady);
+        ArgumentNullException.ThrowIfNull(onCapabilities);
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("The camera bridge requires Windows.");
 
         var controller = ReadControllerConfiguration();
 
-        // Read camera configuration.
+        cancellationToken.ThrowIfCancellationRequested();
+        var speakerphone = _controllerDiscovery.FindController(
+            controller.Vid, controller.Pid, controller.FullUsage);
+        cancellationToken.ThrowIfCancellationRequested();
+        var filter = CreateCameraFilter();
+        try
+        {
+            if (filter is not IAMCameraControl camera)
+            {
+                onCapabilities(CameraControlCapabilities.NotSupported);
+                throw new NotSupportedException("The selected camera does not support IAMCameraControl.");
+            }
+            ProcessReports(speakerphone, camera, controller.ReportId, controller.ButtonMappings,
+                cancellationToken, onReady, onCapabilities);
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(filter);
+        }
+        _logger.LogInfo("Camera bridge stopped.");
+    }
+
+    private object CreateCameraFilter()
+    {
+        if (!string.IsNullOrWhiteSpace(_cameraOptions.DevicePath))
+            return _cameraDiscovery.CreateCameraFilter(_cameraOptions.DevicePath);
+
+        // Preserve USB configuration selection for the console host.
         int cameraVid = ConfigurationHelper.ReadHexValue(
             _cameraOptions.Vid,
             nameof(CameraToControlOptions.Vid),
@@ -53,37 +88,11 @@ public class CameraBridgeManager(
 
         ConfigurationHelper.ValidateUsbInterface(usbInterface, _cameraOptions.UsbInterfacePrefix);
 
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Find the HID controller.
-        var speakerphone = _controllerDiscovery.FindController(
-            controller.Vid, controller.Pid, controller.FullUsage);
-
-        // Find and initialize the camera filter.
-        var filter = _cameraDiscovery.CreateCameraFilter(
+        return _cameraDiscovery.CreateCameraFilter(
             cameraVid,
             cameraPid,
             usbInterface);
 
-        try
-        {
-            if (filter is not IAMCameraControl camera)
-                throw new NotSupportedException(
-                    "The selected camera does not support IAMCameraControl.");
-
-            ProcessReports(
-                speakerphone,
-                camera,
-                controller.ReportId,
-                controller.ButtonMappings,
-                cancellationToken);
-        }
-        finally
-        {
-            Marshal.ReleaseComObject(filter);
-        }
-
-        _logger.LogInfo("Camera bridge stopped.");
     }
 
     private ControllerConfiguration ReadControllerConfiguration()
@@ -146,10 +155,15 @@ public class CameraBridgeManager(
         IAMCameraControl camera,
         int reportId,
         IReadOnlyDictionary<int, (CameraControlProperty Property, int Direction)> buttonMappings,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action onReady,
+        Action<CameraControlCapabilities> onCapabilities)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var controls = new CameraControls(camera, _logger);
-        controls.Initialize();
+        controls.Initialize(onCapabilities);
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Open the controller HID stream.
         using var stream = speakerphone.Open();
@@ -160,8 +174,10 @@ public class CameraBridgeManager(
         _logger.LogInfo($"Report ID: 0x{reportId:X2}");
         foreach (var (code, command) in buttonMappings)
             _logger.LogInfo($"Button 0x{code:X2}: {command.Property}, direction={command.Direction}");
-        _logger.LogInfo("Press Ctrl+C to stop.");
         _logger.LogInfo(string.Empty);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        onReady();
 
         while (!cancellationToken.IsCancellationRequested)
         {

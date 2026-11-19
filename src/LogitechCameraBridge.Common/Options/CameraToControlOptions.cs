@@ -13,4 +13,6 @@ public class CameraToControlOptions
     public string UsbInterfacePrefix { get; set; } = string.Empty;
 
     public string Device { get; set; } = string.Empty;
+
+    public string? DevicePath { get; set; }
 }

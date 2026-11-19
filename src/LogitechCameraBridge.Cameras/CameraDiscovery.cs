@@ -2,6 +2,7 @@ using DirectShowLib;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using LogitechCameraBridge.Cameras.Interfaces;
+using LogitechCameraBridge.Cameras.Models;
 using LogitechCameraBridge.Logger.Interfaces;
 
 namespace LogitechCameraBridge.Cameras;
@@ -11,7 +12,44 @@ public class CameraDiscovery(ICameraBridgeLogger logger) : ICameraDiscovery
     private readonly ICameraBridgeLogger _logger = logger;
 
     /// <inheritdoc />
+    public IReadOnlyList<CameraDeviceInfo> FindCameras()
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("DirectShow camera discovery requires Windows.");
+
+        var devices = DsDevice.GetDevicesOfCat(FilterCategory.VideoInputDevice);
+        try
+        {
+            return devices
+                .Where(device => !string.IsNullOrWhiteSpace(device.DevicePath))
+                .Select(device => new CameraDeviceInfo(
+                    string.IsNullOrWhiteSpace(device.Name) ? "Unnamed camera" : device.Name,
+                    device.DevicePath))
+                .DistinctBy(device => device.DevicePath, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(device => device.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(device => device.DevicePath, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        finally
+        {
+            foreach (var device in devices)
+                device.Dispose();
+        }
+    }
+
+    /// <inheritdoc />
     public object CreateCameraFilter(int vid, int pid, string usbInterface)
+        => CreateCameraFilter(device => MatchesDevice(device, vid, pid, usbInterface),
+            $"VID=0x{vid:X4}, PID=0x{pid:X4}, Interface={usbInterface}");
+
+    public object CreateCameraFilter(string devicePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(devicePath);
+        return CreateCameraFilter(device => string.Equals(device.DevicePath, devicePath,
+            StringComparison.OrdinalIgnoreCase), devicePath);
+    }
+
+    private object CreateCameraFilter(Func<DsDevice, bool> matches, string identity)
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("DirectShow camera discovery requires Windows.");
@@ -21,15 +59,12 @@ public class CameraDiscovery(ICameraBridgeLogger logger) : ICameraDiscovery
 
         try
         {
-            var device = devices.FirstOrDefault(d => MatchesDevice(d, vid, pid, usbInterface))
+            var device = devices.FirstOrDefault(matches)
                 ?? throw new InvalidOperationException(
-                    $"Camera not found. VID=0x{vid:X4}, PID=0x{pid:X4}, Interface={usbInterface}.");
+                    $"Camera not found. {identity}.");
 
             _logger.LogInfo("Camera found.");
             _logger.LogInfo($"Name:      {device.Name}");
-            _logger.LogInfo($"VID:       0x{vid:X4}");
-            _logger.LogInfo($"PID:       0x{pid:X4}");
-            _logger.LogInfo($"Interface: {usbInterface}");
             _logger.LogInfo($"Path:      {device.DevicePath}");
             _logger.LogInfo(string.Empty);
 
