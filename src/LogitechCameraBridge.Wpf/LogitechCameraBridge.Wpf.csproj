@@ -3,12 +3,12 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <StartupObject>LogitechCameraBridge.Wpf.App</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="LogitechCameraBridge.Wpf.Tests" />
     <ApplicationDefinition Remove="App.xaml" />
     <Page Include="App.xaml" />
     <PackageReference Include="Velopack" Version="1.2.161" />

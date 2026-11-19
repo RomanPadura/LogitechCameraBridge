@@ -1,5 +1,5 @@
 using LogitechCameraBridge.Wpf.Models;
-using System.Drawing;
+using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Media.Imaging;
@@ -13,21 +13,18 @@ public static class TrayStatusIcon
 {
     private static readonly Media.Geometry Camera = LoadCamera();
 
-    public static Icon Create(TrayIconState state, int size)
+    public static SafeIconHandle Create(TrayIconState state, int size)
     {
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(Render(state, size)));
         using var png = new MemoryStream();
         encoder.Save(png);
-        png.Position = 0;
-        using var bitmap = new Bitmap(png);
-        IntPtr handle = bitmap.GetHicon();
-        try
-        {
-            using var borrowed = Icon.FromHandle(handle);
-            return (Icon)borrowed.Clone();
-        }
-        finally { DestroyIcon(handle); }
+        byte[] resource = png.ToArray();
+        IntPtr handle = CreateIconFromResourceEx(resource, (uint)resource.Length,
+            true, 0x00030000, size, size, 0);
+        if (handle == IntPtr.Zero)
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot create the tray icon.");
+        return new SafeIconHandle(handle, size);
     }
 
     public static BitmapSource Render(TrayIconState state, int size)
@@ -73,7 +70,7 @@ public static class TrayStatusIcon
         return geometry;
     }
 
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool DestroyIcon(IntPtr icon);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr CreateIconFromResourceEx(byte[] resource, uint size,
+        [MarshalAs(UnmanagedType.Bool)] bool icon, uint version, int width, int height, uint flags);
 }

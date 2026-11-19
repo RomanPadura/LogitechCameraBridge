@@ -1,32 +1,35 @@
-using LogitechCameraBridge.Wpf.Models;
 using System.ComponentModel;
-using System.Drawing;
-using System.Windows.Forms;
-using LogitechCameraBridge.Wpf.ViewModels;
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
 using LogitechCameraBridge.Connector.Models;
+using LogitechCameraBridge.Wpf.Models;
+using LogitechCameraBridge.Wpf.ViewModels;
 
 namespace LogitechCameraBridge.Wpf.Services;
 
 public sealed class TrayIcon : IDisposable
 {
-    private readonly Dictionary<TrayIconState, Icon> _icons = Enum.GetValues<TrayIconState>()
-        .ToDictionary(state => state, state => TrayStatusIcon.Create(state, SystemInformation.SmallIconSize.Width));
+    private readonly Dictionary<TrayIconState, SafeIconHandle> _icons = [];
     private TrayIconState _iconState = TrayIconState.Initializing;
-    private readonly ContextMenuStrip _menu = new();
-    private readonly ToolStripMenuItem _exitItem = new("Exit");
-    private readonly ToolStripMenuItem _restartItem = new("Restart");
-    private readonly ToolStripMenuItem _camerasItem = new("Cameras");
-    private readonly ToolStripMenuItem _statusItem = new("Status");
-    private readonly ToolStripMenuItem _controlsItem = new("Camera controls");
-    private readonly ToolStripMenuItem _aboutItem = new("About");
-    private readonly ToolStripMenuItem _updateItem = new("Check for updates...");
-    private readonly TrayMenuLabel _zoomValue = new("Zoom: Not checked");
-    private readonly TrayMenuLabel _panValue = new("Pan: Not checked");
-    private readonly TrayMenuLabel _tiltValue = new("Tilt: Not checked");
-    private readonly TrayMenuLabel _controllerStatus = new("Logitech Controller: Checking...");
-    private readonly TrayMenuLabel _cameraStatus = new("Camera: Checking...");
-    private readonly TrayMenuLabel _activeStatus = new("Active: false");
-    private readonly NotifyIcon _notifyIcon;
+    private readonly ContextMenu _menu = new();
+    private readonly MenuItem _exitItem = Item("Exit");
+    private readonly MenuItem _restartItem = Item("Restart");
+    private readonly MenuItem _camerasItem = Item("Cameras");
+    private readonly MenuItem _statusItem = Item("Status");
+    private readonly MenuItem _controlsItem = Item("Camera controls");
+    private readonly MenuItem _aboutItem = Item("About");
+    private readonly MenuItem _updateItem = Item("Check for updates...");
+    private readonly TextBlock _zoomValue = new() { Text = "Zoom: Not checked" };
+    private readonly TextBlock _panValue = new() { Text = "Pan: Not checked" };
+    private readonly TextBlock _tiltValue = new() { Text = "Tilt: Not checked" };
+    private readonly TextBlock _controllerStatus = new() { Text = "Logitech Controller: Checking..." };
+    private readonly TextBlock _cameraStatus = new() { Text = "Camera: Checking..." };
+    private readonly TextBlock _activeStatus = new() { Text = "Active: false" };
+    private readonly INotificationAreaIcon _notificationIcon;
     private CameraMenuViewModel? _cameraMenu;
     private StatusViewModel? _status;
     private bool _isDisposed;
@@ -35,30 +38,67 @@ public sealed class TrayIcon : IDisposable
     public event EventHandler? RestartRequested;
     public event EventHandler? UpdateRequested;
 
-    public TrayIcon(AboutViewModel about)
+    public TrayIcon(AboutViewModel about) : this(about, new NotificationAreaIcon()) { }
+
+    internal TrayIcon(AboutViewModel about, INotificationAreaIcon notificationIcon)
     {
-        _exitItem.Click += OnExitClick;
-        _restartItem.Click += OnRestartClick;
-        _statusItem.DropDownItems.AddRange([_controllerStatus, _cameraStatus, _activeStatus]);
-        _menu.Items.Add(_statusItem);
-        _controlsItem.DropDownItems.AddRange([_zoomValue, _panValue, _tiltValue]);
-        _menu.Items.Add(_controlsItem);
-        _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Cameras unavailable") { Enabled = false });
-        _menu.Items.Add(_camerasItem);
-        _aboutItem.DropDownItems.Add(new TrayMenuLabel($"Version: {about.Version}"));
-        _updateItem.Click += OnUpdateClick;
-        _aboutItem.DropDownItems.Add(_updateItem);
-        _menu.Items.Add(_aboutItem);
-        _menu.Items.Add(_restartItem);
-        _menu.Items.Add(_exitItem);
-        _notifyIcon = new NotifyIcon
+        _notificationIcon = notificationIcon;
+        try
         {
-            Icon = _icons[_iconState],
-            Text = "LogitechCameraBridge - starting",
-            ContextMenuStrip = _menu,
-            Visible = true
-        };
+            int size = Math.Max(16, GetSystemMetrics(49)); // SM_CXSMICON, in physical pixels.
+            foreach (var state in Enum.GetValues<TrayIconState>())
+                _icons.Add(state, TrayStatusIcon.Create(state, size));
+            _exitItem.Click += OnExitClick;
+            _restartItem.Click += OnRestartClick;
+            _updateItem.Click += OnUpdateClick;
+            foreach (var label in new[] { _controllerStatus, _cameraStatus, _activeStatus })
+                _statusItem.Items.Add(Label(label));
+            foreach (var label in new[] { _zoomValue, _panValue, _tiltValue })
+                _controlsItem.Items.Add(Label(label));
+            _camerasItem.Items.Add(Item("Cameras unavailable", enabled: false));
+            _aboutItem.Items.Add(Label(new TextBlock { Text = $"Version: {about.Version}" }));
+            _aboutItem.Items.Add(_updateItem);
+            foreach (var item in new[] { _statusItem, _controlsItem, _camerasItem, _aboutItem, _restartItem, _exitItem })
+                _menu.Items.Add(item);
+            _menu.Closed += OnMenuClosed;
+            _notificationIcon.MenuRequested += OnMenuRequested;
+            SetIconState(_iconState);
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
+
+    internal ContextMenu Menu => _menu;
+
+    // TextBlock avoids WPF AccessText interpreting underscores in device names as mnemonics.
+    private static MenuItem Item(string text, bool enabled = true) => new()
+    {
+        Header = new TextBlock { Text = text },
+        IsEnabled = enabled
+    };
+
+    private static MenuItem Label(TextBlock text)
+    {
+        text.Foreground = SystemColors.MenuTextBrush;
+        return new MenuItem { Header = text, IsEnabled = false, Focusable = false };
+    }
+
+    private void OnMenuRequested(Point? position)
+    {
+        if (_isDisposed)
+            return;
+        _notificationIcon.Activate();
+        _menu.Placement = position.HasValue ? PlacementMode.AbsolutePoint : PlacementMode.MousePoint;
+        _menu.HorizontalOffset = position?.X ?? 0;
+        _menu.VerticalOffset = position?.Y ?? 0;
+        _menu.IsOpen = true;
+        Keyboard.Focus(_menu);
+    }
+
+    private void OnMenuClosed(object? sender, RoutedEventArgs e) => _notificationIcon.ReturnFocus();
 
     public void ConfigureStatus(StatusViewModel status)
     {
@@ -75,12 +115,12 @@ public sealed class TrayIcon : IDisposable
     {
         if (_isDisposed || _status is null)
             return;
-        _controllerStatus.Text = $"Logitech Controller: {_status.Controller.Text.Replace("&", "&&")}";
-        _controllerStatus.ForeColor = _status.Controller.IsError ? Color.Red : SystemColors.MenuText;
-        _cameraStatus.Text = $"Camera: {_status.Camera.Text.Replace("&", "&&")}";
-        _cameraStatus.ForeColor = _status.Camera.IsError ? Color.Red : SystemColors.MenuText;
+        _controllerStatus.Text = $"Logitech Controller: {_status.Controller.Text}";
+        _controllerStatus.Foreground = _status.Controller.IsError ? Brushes.Red : SystemColors.MenuTextBrush;
+        _cameraStatus.Text = $"Camera: {_status.Camera.Text}";
+        _cameraStatus.Foreground = _status.Camera.IsError ? Brushes.Red : SystemColors.MenuTextBrush;
         _activeStatus.Text = _status.Active ? "Active: true" : "Active: false";
-        _activeStatus.ForeColor = _status.Active ? SystemColors.MenuText : Color.Red;
+        _activeStatus.Foreground = _status.Active ? SystemColors.MenuTextBrush : Brushes.Red;
         SetIconState(_status.TrayState);
         var capabilities = _status.Capabilities;
         RenderControl(_zoomValue, "Zoom", capabilities.Zoom, capabilities.ZoomValue);
@@ -88,7 +128,7 @@ public sealed class TrayIcon : IDisposable
         RenderControl(_tiltValue, "Tilt", capabilities.Tilt, capabilities.TiltValue);
     }
 
-    private static void RenderControl(TrayMenuLabel label, string name, CameraControlSupport support, CameraControlValue? value)
+    private static void RenderControl(TextBlock label, string name, CameraControlSupport support, CameraControlValue? value)
     {
         string text = support switch
         {
@@ -99,25 +139,22 @@ public sealed class TrayIcon : IDisposable
             _ => "Not checked"
         };
         label.Text = $"{name}: {text}";
-        label.ForeColor = support == CameraControlSupport.Error ? Color.Red
+        label.Foreground = support == CameraControlSupport.Error ? Brushes.Red
             : support == CameraControlSupport.NotSupported || support == CameraControlSupport.NotChecked
-                ? SystemColors.GrayText : SystemColors.MenuText;
+                ? SystemColors.GrayTextBrush : SystemColors.MenuTextBrush;
     }
 
     private void SetIconState(TrayIconState state)
     {
-        if (_iconState != state)
-        {
-            _iconState = state;
-            _notifyIcon.Icon = _icons[state];
-        }
-        _notifyIcon.Text = state switch
+        _iconState = state;
+        string text = state switch
         {
             TrayIconState.Healthy => "LogitechCameraBridge - active",
             TrayIconState.CameraNotSelected => "LogitechCameraBridge - camera not selected",
             TrayIconState.Error => "LogitechCameraBridge - error; check logs",
             _ => "LogitechCameraBridge - starting"
         };
+        _notificationIcon.Update(_icons[state], text);
     }
 
     public void ConfigureCameras(CameraMenuViewModel cameraMenu)
@@ -131,12 +168,9 @@ public sealed class TrayIcon : IDisposable
 
     public void DisableExit()
     {
-        _exitItem.Enabled = false;
-        _restartItem.Enabled = false;
-        _camerasItem.Enabled = false;
-        _statusItem.Enabled = false;
-        _controlsItem.Enabled = false;
-        _aboutItem.Enabled = false;
+        foreach (MenuItem item in _menu.Items)
+            item.IsEnabled = false;
+        _menu.IsOpen = false;
     }
 
     private void OnCameraMenuChanged(object? sender, PropertyChangedEventArgs e) => RenderCameras();
@@ -145,95 +179,83 @@ public sealed class TrayIcon : IDisposable
     {
         if (_isDisposed || _cameraMenu is null)
             return;
-
-        foreach (ToolStripItem item in _camerasItem.DropDownItems.Cast<ToolStripItem>().ToArray())
-        {
-            _camerasItem.DropDownItems.Remove(item);
-            item.Dispose();
-        }
-
+        _camerasItem.Items.Clear();
         if (_cameraMenu.IsBusy)
         {
-            _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Please wait...") { Enabled = false });
+            _camerasItem.Items.Add(Item("Please wait...", enabled: false));
             return;
         }
-
         if (!string.IsNullOrEmpty(_cameraMenu.Error))
-            _camerasItem.DropDownItems.Add(new ToolStripMenuItem(_cameraMenu.Error) { Enabled = false });
-
+            _camerasItem.Items.Add(Item(_cameraMenu.Error, enabled: false));
         foreach (var group in _cameraMenu.Cameras.GroupBy(camera => camera.Name, StringComparer.CurrentCultureIgnoreCase))
         {
             int index = 0;
             foreach (var camera in group)
             {
                 string label = group.Count() > 1 ? $"{camera.Name} ({++index})" : camera.Name;
-                var item = new ToolStripMenuItem(label)
-                {
-                    // Device names may contain '&'; display them literally instead of as access keys.
-                    Text = label.Replace("&", "&&"),
-                    Checked = string.Equals(camera.DevicePath, _cameraMenu.SelectedCamera?.DevicePath,
-                        StringComparison.OrdinalIgnoreCase)
-                };
+                var item = Item(label);
+                item.IsChecked = string.Equals(camera.DevicePath, _cameraMenu.SelectedCamera?.DevicePath,
+                    StringComparison.OrdinalIgnoreCase);
                 item.Click += async (_, _) =>
                 {
                     if (_isDisposed || !_cameraMenu.SelectCommand.CanExecute(camera))
                         return;
+                    _menu.IsOpen = false;
                     await _cameraMenu.SelectCommand.ExecuteAsync(camera);
-                    // The menu closes on click; make a failed save visible immediately.
                     if (!_isDisposed && !string.IsNullOrEmpty(_cameraMenu.Error))
-                        _notifyIcon.ShowBalloonTip(5000, "Camera selection", _cameraMenu.Error, ToolTipIcon.Error);
+                        _notificationIcon.ShowMessage("Camera selection", _cameraMenu.Error, error: true);
                     else if (!_isDisposed)
                         RestartRequested?.Invoke(this, EventArgs.Empty);
                 };
-                _camerasItem.DropDownItems.Add(item);
+                _camerasItem.Items.Add(item);
             }
         }
-
         var selected = _cameraMenu.SelectedCamera;
         if (selected is not null && string.IsNullOrEmpty(_cameraMenu.Error) && !_cameraMenu.Cameras.Any(camera => string.Equals(
                 camera.DevicePath, selected.DevicePath, StringComparison.OrdinalIgnoreCase)))
         {
-            _camerasItem.DropDownItems.Add(new ToolStripMenuItem(
-                $"{selected.Name.Replace("&", "&&")} (saved; unavailable)") { Enabled = false, Checked = true });
+            var unavailable = Item($"{selected.Name} (saved; unavailable)", enabled: false);
+            unavailable.IsChecked = true;
+            _camerasItem.Items.Add(unavailable);
         }
         if (_cameraMenu.Cameras.Count == 0 && string.IsNullOrEmpty(_cameraMenu.Error))
-            _camerasItem.DropDownItems.Add(new ToolStripMenuItem("No cameras found") { Enabled = false });
+            _camerasItem.Items.Add(Item("No cameras found", enabled: false));
     }
 
     public void ShowStartupFailure()
     {
         SetIconState(TrayIconState.Error);
-        _notifyIcon.Text = "LogitechCameraBridge - startup failed";
+        _notificationIcon.Update(_icons[_iconState], "LogitechCameraBridge - startup failed");
         _controllerStatus.Text = "Logitech Controller: Error";
         _cameraStatus.Text = "Camera: Error";
         _activeStatus.Text = "Active: false";
-        _controllerStatus.ForeColor = _cameraStatus.ForeColor = _activeStatus.ForeColor = Color.Red;
+        _controllerStatus.Foreground = _cameraStatus.Foreground = _activeStatus.Foreground = Brushes.Red;
     }
 
-    public void ShowError(string message) => _notifyIcon.ShowBalloonTip(5000, "Camera bridge", message, ToolTipIcon.Error);
+    public void ShowError(string message) => _notificationIcon.ShowMessage("Camera bridge", message, error: true);
 
     public void SetUpdating(bool updating)
     {
-        _updateItem.Enabled = !updating;
-        _updateItem.Text = updating ? "Checking / downloading update..." : "Check for updates...";
+        _updateItem.IsEnabled = !updating;
+        ((TextBlock)_updateItem.Header).Text = updating ? "Checking / downloading update..." : "Check for updates...";
     }
 
     public void ShowUpdateMessage(string message) =>
-        _notifyIcon.ShowBalloonTip(5000, "Application updates", message, ToolTipIcon.Info);
+        _notificationIcon.ShowMessage("Application updates", message, error: false);
 
-    private void OnUpdateClick(object? sender, EventArgs e) => UpdateRequested?.Invoke(this, EventArgs.Empty);
-
-    private void OnExitClick(object? sender, EventArgs e) => ExitRequested?.Invoke(this, EventArgs.Empty);
-    private void OnRestartClick(object? sender, EventArgs e) => RestartRequested?.Invoke(this, EventArgs.Empty);
+    private void OnUpdateClick(object sender, RoutedEventArgs e) => UpdateRequested?.Invoke(this, EventArgs.Empty);
+    private void OnExitClick(object sender, RoutedEventArgs e) => ExitRequested?.Invoke(this, EventArgs.Empty);
+    private void OnRestartClick(object sender, RoutedEventArgs e) => RestartRequested?.Invoke(this, EventArgs.Empty);
 
     public void Dispose()
     {
         if (_isDisposed)
             return;
-
         _isDisposed = true;
-        _notifyIcon.Visible = false;
-        _notifyIcon.Dispose();
+        _menu.Closed -= OnMenuClosed;
+        _menu.IsOpen = false;
+        _notificationIcon.MenuRequested -= OnMenuRequested;
+        _notificationIcon.Dispose();
         if (_cameraMenu is not null)
             _cameraMenu.PropertyChanged -= OnCameraMenuChanged;
         if (_status is not null)
@@ -241,8 +263,12 @@ public sealed class TrayIcon : IDisposable
         _exitItem.Click -= OnExitClick;
         _restartItem.Click -= OnRestartClick;
         _updateItem.Click -= OnUpdateClick;
-        _menu.Dispose();
+        _menu.Items.Clear();
         foreach (var icon in _icons.Values)
             icon.Dispose();
+        _icons.Clear();
     }
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
 }

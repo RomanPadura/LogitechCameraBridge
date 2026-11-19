@@ -39,6 +39,10 @@ dotnet run --project src/LogitechCameraBridge.Wpf
 The app uses .NET 10 WPF, MVVM, DI and the shared console appSettings.json. It has no startup
 window or taskbar button. Its tray menu contains Status, Camera controls, Cameras, About, Restart and Exit.
 
+The notification-area icon uses the Windows Shell API with a hidden message window;
+all menus use WPF controls. There is no WinForms dependency. The icon is restored
+automatically after Windows Explorer restarts, and removed when the app exits.
+
 Startup performs one attempt:
 
 1. Find the configured controller and publish its status.

@@ -120,7 +120,8 @@ runtime errors to the ViewModel. The original JSON file is linked into the WPF o
 
 ## Tray application: one startup attempt
 
-App creates no startup window/taskbar button. NotifyIcon exposes Status, Camera controls, Cameras, Restart and Exit.
+App creates no startup window/taskbar button. Native Shell_NotifyIcon with WPF menus exposes
+Status, Camera controls, Cameras, About, Restart and Exit.
 The shared console JSON is linked into WPF output/publish. UseControllerStub selects stub/physical DI.
 
 StatusViewModel.InitializeAsync is invoked automatically, once per process. It discovers the
@@ -136,7 +137,7 @@ and requests an application restart after a successful save. Failed saves never 
 CameraMenuViewModel latches scan/save failures. Initialization/runtime faults make Active false,
 retain Error, cancel the worker and require restart. App blocks keys unless Active.
 
-Status rows are read-only ToolStripLabels with red error/no-selection/inactive text. Controller shows
+Status rows are WPF TextBlocks in disabled MenuItems, with red error/no-selection/inactive text. Controller shows
 Stub / <device name> / Not found / Error. ControllerNotFoundException derives
 from InvalidOperationException. Camera shows <camera name> / Not selected / Error.
 Status is updated by startup and worker progress, without continuous hotplug monitoring.
@@ -158,8 +159,9 @@ end-to-end acceptance of published Velopack updates, and prior physical-controll
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 49 connector/logger/stub and 66 WPF tests
-passed (115 total), including hold/release timing, ignored Far End input, driver failures and atomic simulated taps.
+Latest automated checks: build without warnings/errors; 49 connector/logger/stub and 75 WPF tests
+passed (124 total), including hold/release timing, ignored Far End input, driver failures,
+atomic simulated taps, native tray lifecycle and WPF menu actions/layout.
 Prior self-contained win-x64 publish and Velopack installer/feed packaging checks also passed.
 Added capability checks distinguish unsupported driver responses from generic
 failures, validate manual support/ranges/current values without Set, publish all axes before required
@@ -200,8 +202,9 @@ retains actual device identities. No new hardware acceptance is implied by the R
 The Microsoft Fluent camera_24_filled SVG is embedded as FluentCamera.svg; its MIT license and
 source attribution are under Assets. The license is copied into output/publish. TrayStatusIcon
 renders the frozen path with a light disk and colored ring at the current system small-icon size.
-Temporary HICONs are destroyed after cloning; four owned icon variants are cached for the tray
-lifetime, switched only when the state changes, and disposed after NotifyIcon disposal.
+WPF PNG encoding and CreateIconFromResourceEx create the HICONs without System.Drawing.
+Four SafeIconHandle variants are cached for the tray lifetime and destroyed after the native
+notification registration has been deleted. There is no WinForms framework reference.
 Green means confirmed readiness; red means error; orange means only the camera selection is
 unavailable while the controller was found. Errors take priority. Gray is reserved for initialization.
 StatusViewModel exposes typed TrayState with property notifications rather than deriving colors
@@ -210,6 +213,21 @@ Tooltips identify the state without relying only on color. Rendering tests expor
 TestResults/tray-icons-preview.png without starting the application or accessing devices.
 
 ## Hardware test status
+
+### Native tray and WPF menus
+
+NotificationAreaIcon owns a hidden top-level HwndSource (not a message-only window),
+registers Shell_NotifyIcon version 4, routes context-menu/keyboard callbacks, and listens
+for TaskbarCreated to re-add the current icon after Explorer restarts. Failed registration
+retries on a dispatcher timer; Dispose stops retries, deletes the icon and destroys the HWND.
+Context menus use the icon rectangle for positioning, foreground activation before showing,
+and NIM_SETFOCUS after dismissal. WPF TextBlock headers preserve literal underscores and
+ampersands in camera names. Informational rows are disabled MenuItems with explicit text colors.
+INotificationAreaIcon separates native Shell calls from the WPF menu for hardware-free tests.
+Tests send native window messages with a recording Shell backend to verify registration,
+recovery, callback versions, notifications and cleanup. WPF popup tests check author text at
+12/18/24 DIP font sizes; TestResults/wpf-about-menu-preview.png was visually inspected.
+Actual Explorer restart and tray interaction across monitor DPI settings remain manual checks.
 
 ### About submenu
 
