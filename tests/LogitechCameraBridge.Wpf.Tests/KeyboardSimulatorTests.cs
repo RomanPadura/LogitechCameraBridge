@@ -34,6 +34,9 @@ public class KeyboardSimulatorTests
         var report = stream.Read();
         Assert.Equal(0x0A, report[0]);
         Assert.Equal(expected, report[1]);
+        var release = stream.Read();
+        Assert.Equal(0x0A, release[0]);
+        Assert.Equal(0x00, release[1]);
         activity.CameraError("device-1", "Set failed");
         await simulator.PressAsync(button);
         Assert.Throws<TimeoutException>(() => stream.Read());

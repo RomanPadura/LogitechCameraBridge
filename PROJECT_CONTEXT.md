@@ -7,9 +7,11 @@
 - Logitech C930e: VID 0x046D, PID 0x0843, USB interface MI_00.
 - Known HID reports are 13 bytes: report ID 0x0A at byte 0, button code at byte 1.
 - Zoom In/Out: 0x10/0x20. Left/Right: 0x08/0x04. Up/Down: 0x01/0x02.
-- Far End: 0x40, currently ignored. Presets 1/2/3 are outside the project scope.
-- Codes 0x00 and 0xFF are always ignored. The user also observed them when toggling the microphone;
-  the exact meaning of 0xFF is not established.
+- Far End: 0x40, not implemented. The user explicitly deferred reset: remember that a future
+  Far End reset should restore camera driver factory/default values, not startup position or
+  a user-saved preset. Do not implement it until requested. Presets 1/2/3 remain out of scope.
+- The user's supplied mapping identifies 0x00 as release (stops repeat); 0xFF remains ignored.
+  Physical hold/release acceptance still needs testing on the actual controller.
 
 ## Current structure
 
@@ -86,7 +88,14 @@ On each supported button report, read the current property, add or subtract one 
 clamp to Min/Max, and call `Set` with `CameraControlFlags.Manual` if the value changes.
 Every control HRESULT is checked. Failures are logged: console continues processing; WPF cancels the session and requires restart.
 Right/Up initially increase values; Left/Down decrease them. Physical image directions are pending verification.
-No reset, hold/repeat, automatic zoom adjustment, reconnection, or WPF window is implemented yet.
+`ControllerButtonRepeater` performs a step on press, then repeats after 400 ms at 100 ms
+intervals while held. Duplicate codes are ignored until release/direction change, 0x00 stops,
+0xFF is ignored, and an unmapped code cancels holding. Limit/no movement/COM failure stops
+repeat until a new press. HID reads time out every 50 ms so the same worker can run repeat
+ticks; no camera timer or extra COM thread is created. Read failures/disconnect exit the loop.
+Far End has no reset action; factory/default reset is only a remembered future request.
+Keyboard simulation uses an atomic press/release pair to preserve one-step chord behavior.
+No automatic zoom adjustment, reconnection, or WPF window is implemented yet.
 
 ## WPF lifecycle foundation
 
@@ -143,8 +152,9 @@ end-to-end acceptance of published Velopack updates, and prior physical-controll
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 39 connector/logger/stub and 66 WPF tests
-passed (105 total). Self-contained win-x64 publish and Velopack installer/feed packaging also pass.
+Latest automated checks: build without warnings/errors; 49 connector/logger/stub and 66 WPF tests
+passed (115 total), including hold/release timing, ignored Far End input, driver failures and atomic simulated taps.
+Prior self-contained win-x64 publish and Velopack installer/feed packaging checks also passed.
 Added capability checks distinguish unsupported driver responses from generic
 failures, validate manual support/ranges/current values without Set, publish all axes before required
 Zoom failure, update values after movement/at limits, remove failed current reads, and forward typed
