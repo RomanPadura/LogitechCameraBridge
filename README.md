@@ -15,7 +15,7 @@ All button codes are hexadecimal strings in `BridgeControllerDevice`.
 Set `Logger.LogToConsole` to `true` to see discovery, ranges, reports, and errors.
 Restart the app after configuration changes.
 
-## WPF tray app (step 1)
+## WPF tray app
 
 `src/LogitechCameraBridge.Wpf` targets `net10.0-windows` and uses CommunityToolkit.Mvvm,
 DI and options from the same linked `LogitechCameraBridgeConsole/appSettings.json`.
@@ -27,11 +27,26 @@ dotnet run --project src/LogitechCameraBridge.Wpf
 
 The app creates no startup window or taskbar button. Find the standard application icon
 in the Windows notification area (possibly under **Show hidden icons**). Hover over it to
-identify `LogitechCameraBridge`, then right-click and choose **Exit**. This step implements
-only the tray shell: it does not start the bridge or access HID/camera hardware.
+identify `LogitechCameraBridge`, then right-click for **Cameras** and **Exit**.
+The app does not start the bridge yet. Camera discovery lists Windows DirectShow video inputs
+without opening camera filters or starting video capture.
 Exit flushes queued logs, disposes services and removes the tray icon before the process ends.
 If configuration startup fails, the tooltip says `LogitechCameraBridge - startup failed`;
 Exit remains available and no error window is shown.
+
+Open **Cameras** to refresh the device list asynchronously. Select a camera to save its name and
+device path in `%LocalAppData%\LogitechCameraBridge\userSettings.json`. A check mark indicates
+the saved choice; identical camera names receive numbered labels. The device path distinguishes
+individual cameras. When the saved camera is disconnected, the menu retains a disabled
+`(saved; unavailable)` entry instead of silently selecting another camera.
+The saved choice is restored when the menu is opened after restarting the app.
+
+User preferences are separate from the shared `appSettings.json`, so rebuilds do not replace the
+selection. Writes preserve other JSON settings and replace the file after the new document is
+complete. Invalid JSON is reported without overwriting the file. Scan/save errors appear in the menu
+and are logged; failed saves also request a tray notification. A failed save retains the previous choice.
+Exit waits for an in-progress scan or save before disposing application services.
+Automatic bridge startup using this selection when a controller is found is a later step.
 
 The foundation includes a dedicated MTA bridge worker, cancellation, overlapping-run protection,
 and a ViewModel with Start/Stop commands, readiness status and error reporting.
@@ -44,13 +59,14 @@ Do not run the console host and a bridge-enabled WPF host simultaneously during 
 Manual tray check:
 
 1. Run the command and verify that no window or application taskbar button appears.
-2. Locate the tray icon and verify that its context menu contains only **Exit**.
-3. Choose **Exit** and confirm that the icon disappears and `dotnet run` returns to the prompt.
-4. Repeat the launch/exit cycle to check for leftover icons or processes.
+2. Open **Cameras** and verify that the available cameras appear. With no cameras, expect **No cameras found**.
+3. Select a camera, reopen the menu, and verify its check mark and the `SelectedCamera` JSON entry.
+4. Choose **Exit**, restart, and open **Cameras** to verify that the same choice is checked.
+5. Disconnect the selected camera and reopen the menu: its saved identity should remain unavailable.
+6. Choose **Exit** and confirm that the icon disappears and `dotnet run` returns to the prompt.
 
 Subsequent steps will add bridge startup and a **Status** submenu with one current value
-(`Active`, `Controller not found`, `Camera not found`, or `Unknown error`), then a **Cameras**
-selection menu that remembers the choice, followed by **About** and **Update**.
+(`Active`, `Controller not found`, `Camera not found`, or `Unknown error`), followed by **About** and **Update**.
 Each step is kept separate for user verification and a user-created commit.
 
 ## Controller commands

@@ -2,6 +2,7 @@ using DirectShowLib;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using LogitechCameraBridge.Cameras.Interfaces;
+using LogitechCameraBridge.Cameras.Models;
 using LogitechCameraBridge.Logger.Interfaces;
 
 namespace LogitechCameraBridge.Cameras;
@@ -9,6 +10,32 @@ namespace LogitechCameraBridge.Cameras;
 public class CameraDiscovery(ICameraBridgeLogger logger) : ICameraDiscovery
 {
     private readonly ICameraBridgeLogger _logger = logger;
+
+    /// <inheritdoc />
+    public IReadOnlyList<CameraDeviceInfo> FindCameras()
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("DirectShow camera discovery requires Windows.");
+
+        var devices = DsDevice.GetDevicesOfCat(FilterCategory.VideoInputDevice);
+        try
+        {
+            return devices
+                .Where(device => !string.IsNullOrWhiteSpace(device.DevicePath))
+                .Select(device => new CameraDeviceInfo(
+                    string.IsNullOrWhiteSpace(device.Name) ? "Unnamed camera" : device.Name,
+                    device.DevicePath))
+                .DistinctBy(device => device.DevicePath, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(device => device.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(device => device.DevicePath, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        finally
+        {
+            foreach (var device in devices)
+                device.Dispose();
+        }
+    }
 
     /// <inheritdoc />
     public object CreateCameraFilter(int vid, int pid, string usbInterface)

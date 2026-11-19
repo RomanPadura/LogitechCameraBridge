@@ -69,7 +69,7 @@ public class MainViewModelTests
         Assert.True(model.StartCommand.CanExecute(null));
     });
 
-    private static Task OnDispatcherAsync(Func<Task> body)
+    internal static Task OnDispatcherAsync(Func<Task> body)
     {
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>

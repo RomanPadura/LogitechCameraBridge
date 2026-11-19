@@ -14,6 +14,7 @@ public partial class App : System.Windows.Application
     private IConfigurationRoot? _configuration;
     private ServiceProvider? _services;
     private MainViewModel? _viewModel;
+    private CameraMenuViewModel? _cameraMenu;
     private CameraBridgeLogger? _logger;
     private bool _isExiting;
 
@@ -36,6 +37,8 @@ public partial class App : System.Windows.Application
                 .BuildServiceProvider();
             _logger = _services.GetRequiredService<CameraBridgeLogger>();
             _viewModel = _services.GetRequiredService<MainViewModel>();
+            _cameraMenu = _services.GetRequiredService<CameraMenuViewModel>();
+            _trayIcon.ConfigureCameras(_cameraMenu);
             _logger.LogInfo("Tray application started. Bridge startup is not enabled in this step.");
         }
         catch (Exception ex)
@@ -57,6 +60,8 @@ public partial class App : System.Windows.Application
         int exitCode = 0;
         try
         {
+            if (_cameraMenu is not null)
+                await _cameraMenu.ShutdownAsync();
             if (_viewModel is not null)
                 await _viewModel.ShutdownAsync();
             if (_logger is not null)

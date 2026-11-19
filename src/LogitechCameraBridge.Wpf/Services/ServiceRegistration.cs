@@ -1,3 +1,4 @@
+using System.IO;
 using LogitechCameraBridge.Cameras;
 using LogitechCameraBridge.Cameras.Interfaces;
 using LogitechCameraBridge.Common.Options;
@@ -28,6 +29,10 @@ public static class ServiceRegistration
         services.AddSingleton<ICameraBridgeManager, CameraBridgeManager>();
         services.AddSingleton<IBridgeSession, BridgeSession>();
         services.AddSingleton<MainViewModel>();
+        services.AddSingleton<ICameraSelectionStore>(_ => new JsonCameraSelectionStore(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "LogitechCameraBridge", "userSettings.json")));
+        services.AddSingleton<CameraMenuViewModel>();
         return services;
     }
 }

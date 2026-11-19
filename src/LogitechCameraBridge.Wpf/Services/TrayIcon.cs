@@ -1,5 +1,7 @@
+using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
+using LogitechCameraBridge.Wpf.ViewModels;
 
 namespace LogitechCameraBridge.Wpf.Services;
 
@@ -8,7 +10,9 @@ public sealed class TrayIcon : IDisposable
     private readonly Icon _icon = (Icon)SystemIcons.Application.Clone();
     private readonly ContextMenuStrip _menu = new();
     private readonly ToolStripMenuItem _exitItem = new("Exit");
+    private readonly ToolStripMenuItem _camerasItem = new("Cameras");
     private readonly NotifyIcon _notifyIcon;
+    private CameraMenuViewModel? _cameraMenu;
     private bool _isDisposed;
 
     public event EventHandler? ExitRequested;
@@ -16,6 +20,9 @@ public sealed class TrayIcon : IDisposable
     public TrayIcon()
     {
         _exitItem.Click += OnExitClick;
+        _camerasItem.DropDownOpening += OnCamerasOpening;
+        _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Cameras unavailable") { Enabled = false });
+        _menu.Items.Add(_camerasItem);
         _menu.Items.Add(_exitItem);
         _notifyIcon = new NotifyIcon
         {
@@ -26,7 +33,83 @@ public sealed class TrayIcon : IDisposable
         };
     }
 
-    public void DisableExit() => _exitItem.Enabled = false;
+    public void ConfigureCameras(CameraMenuViewModel cameraMenu)
+    {
+        if (_cameraMenu is not null)
+            _cameraMenu.PropertyChanged -= OnCameraMenuChanged;
+        _cameraMenu = cameraMenu;
+        _cameraMenu.PropertyChanged += OnCameraMenuChanged;
+        RenderCameras();
+    }
+
+    public void DisableExit()
+    {
+        _exitItem.Enabled = false;
+        _camerasItem.Enabled = false;
+    }
+
+    private async void OnCamerasOpening(object? sender, EventArgs e)
+    {
+        if (_cameraMenu is not null && _cameraMenu.RefreshCommand.CanExecute(null))
+            await _cameraMenu.RefreshCommand.ExecuteAsync(null);
+    }
+
+    private void OnCameraMenuChanged(object? sender, PropertyChangedEventArgs e) => RenderCameras();
+
+    private void RenderCameras()
+    {
+        if (_isDisposed || _cameraMenu is null)
+            return;
+
+        foreach (ToolStripItem item in _camerasItem.DropDownItems.Cast<ToolStripItem>().ToArray())
+        {
+            _camerasItem.DropDownItems.Remove(item);
+            item.Dispose();
+        }
+
+        if (_cameraMenu.IsBusy)
+        {
+            _camerasItem.DropDownItems.Add(new ToolStripMenuItem("Please wait...") { Enabled = false });
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(_cameraMenu.Error))
+            _camerasItem.DropDownItems.Add(new ToolStripMenuItem(_cameraMenu.Error) { Enabled = false });
+
+        foreach (var group in _cameraMenu.Cameras.GroupBy(camera => camera.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            int index = 0;
+            foreach (var camera in group)
+            {
+                string label = group.Count() > 1 ? $"{camera.Name} ({++index})" : camera.Name;
+                var item = new ToolStripMenuItem(label)
+                {
+                    // Device names may contain '&'; display them literally instead of as access keys.
+                    Text = label.Replace("&", "&&"),
+                    Checked = string.Equals(camera.DevicePath, _cameraMenu.SelectedCamera?.DevicePath,
+                        StringComparison.OrdinalIgnoreCase)
+                };
+                item.Click += async (_, _) =>
+                {
+                    await _cameraMenu.SelectCommand.ExecuteAsync(camera);
+                    // The menu closes on click; make a failed save visible immediately.
+                    if (!_isDisposed && !string.IsNullOrEmpty(_cameraMenu.Error))
+                        _notifyIcon.ShowBalloonTip(5000, "Camera selection", _cameraMenu.Error, ToolTipIcon.Error);
+                };
+                _camerasItem.DropDownItems.Add(item);
+            }
+        }
+
+        var selected = _cameraMenu.SelectedCamera;
+        if (selected is not null && string.IsNullOrEmpty(_cameraMenu.Error) && !_cameraMenu.Cameras.Any(camera => string.Equals(
+                camera.DevicePath, selected.DevicePath, StringComparison.OrdinalIgnoreCase)))
+        {
+            _camerasItem.DropDownItems.Add(new ToolStripMenuItem(
+                $"{selected.Name.Replace("&", "&&")} (saved; unavailable)") { Enabled = false, Checked = true });
+        }
+        if (_cameraMenu.Cameras.Count == 0 && string.IsNullOrEmpty(_cameraMenu.Error))
+            _camerasItem.DropDownItems.Add(new ToolStripMenuItem("No cameras found") { Enabled = false });
+    }
 
     public void ShowStartupFailure() => _notifyIcon.Text = "LogitechCameraBridge - startup failed";
 
@@ -40,6 +123,9 @@ public sealed class TrayIcon : IDisposable
         _isDisposed = true;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        if (_cameraMenu is not null)
+            _cameraMenu.PropertyChanged -= OnCameraMenuChanged;
+        _camerasItem.DropDownOpening -= OnCamerasOpening;
         _exitItem.Click -= OnExitClick;
         _menu.Dispose();
         _icon.Dispose();
