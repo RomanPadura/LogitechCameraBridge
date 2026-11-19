@@ -31,7 +31,11 @@ public class CameraBridgeManager(
         cameraOptions.Value;
 
     public void Start(CancellationToken cancellationToken = default)
+        => Start(cancellationToken, static () => { });
+
+    public void Start(CancellationToken cancellationToken, Action onReady)
     {
+        ArgumentNullException.ThrowIfNull(onReady);
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("The camera bridge requires Windows.");
 
@@ -59,6 +63,8 @@ public class CameraBridgeManager(
         var speakerphone = _controllerDiscovery.FindController(
             controller.Vid, controller.Pid, controller.FullUsage);
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         // Find and initialize the camera filter.
         var filter = _cameraDiscovery.CreateCameraFilter(
             cameraVid,
@@ -76,7 +82,8 @@ public class CameraBridgeManager(
                 camera,
                 controller.ReportId,
                 controller.ButtonMappings,
-                cancellationToken);
+                cancellationToken,
+                onReady);
         }
         finally
         {
@@ -146,10 +153,14 @@ public class CameraBridgeManager(
         IAMCameraControl camera,
         int reportId,
         IReadOnlyDictionary<int, (CameraControlProperty Property, int Direction)> buttonMappings,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action onReady)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var controls = new CameraControls(camera, _logger);
         controls.Initialize();
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Open the controller HID stream.
         using var stream = speakerphone.Open();
@@ -160,8 +171,10 @@ public class CameraBridgeManager(
         _logger.LogInfo($"Report ID: 0x{reportId:X2}");
         foreach (var (code, command) in buttonMappings)
             _logger.LogInfo($"Button 0x{code:X2}: {command.Property}, direction={command.Direction}");
-        _logger.LogInfo("Press Ctrl+C to stop.");
         _logger.LogInfo(string.Empty);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        onReady();
 
         while (!cancellationToken.IsCancellationRequested)
         {
