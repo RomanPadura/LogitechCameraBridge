@@ -159,8 +159,8 @@ end-to-end acceptance of published Velopack updates, and prior physical-controll
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 49 connector/logger/stub and 75 WPF tests
-passed (124 total), including hold/release timing, ignored Far End input, driver failures,
+Latest automated checks: build without warnings/errors; 49 connector/logger/stub and 84 WPF tests
+passed (133 total), including startup registration/toggling, hold/release timing, ignored Far End input, driver failures,
 atomic simulated taps, native tray lifecycle and WPF menu actions/layout.
 Prior self-contained win-x64 publish and Velopack installer/feed packaging checks also passed.
 Added capability checks distinguish unsupported driver responses from generic
@@ -223,6 +223,18 @@ TestResults/tray-icons-preview.png without starting the application or accessing
 ## Hardware test status
 
 ### Native tray and WPF menus
+
+Starts with OS is a root submenu between About and Restart with Activate/Deactivate
+actions. Its header reports true/false; the action matching the current state is disabled. WindowsStartup
+reads/writes only HKCU Software\Microsoft\Windows\CurrentVersion\Run value LogitechCameraBridge.
+It defaults off, uses the quoted Velopack UpdateExePath with `start`, and never targets
+the replaceable current/ directory. Development and portable builds hide the submenu entirely,
+including when a stale entry exists. The menu refreshes registration on open and preserves previous action states
+on write failure without stopping the bridge. Startup Apps/Task Manager can separately override
+the Run entry; the menu reports registration only. A before-uninstall fast callback removes
+the entry, logging cleanup failures without blocking uninstall. Tests use fake registry delegates
+and do not register this development checkout for Windows startup.
+The startup/menu test selection passes all 13 tests after the submenu/visibility changes.
 
 NotificationAreaIcon owns a hidden top-level HwndSource (not a message-only window),
 registers Shell_NotifyIcon version 4, routes right-click (WM_CONTEXTMENU), left-click

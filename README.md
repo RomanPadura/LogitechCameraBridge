@@ -44,6 +44,19 @@ all menus use WPF controls. There is no WinForms dependency. The icon is restore
 automatically after Windows Explorer restarts, and removed when the app exits.
 Both left-click and right-click on the tray icon open the same menu; keyboard activation also works.
 
+**Starts with OS: true/false** is a submenu with **Activate** and **Deactivate**
+actions (off by default). The action matching the current state is disabled. It registers the
+app for the current Windows user at sign-in, without administrator rights, using
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\LogitechCameraBridge`.
+The command points to the package's stable `Update.exe start` launcher so it survives
+app updates. Deactivate removes the entry; uninstall also attempts to remove it.
+The preference is read from the registry and does not change `userSettings.json`.
+
+The submenu is visible only in an installed release. It is hidden in development
+builds and portable packages, even if an older startup entry exists.
+If you disable the app in Windows Startup Apps/Task Manager, re-enable it there;
+the tray status reflects the app's Run registration, not Windows' separate override.
+
 Startup performs one attempt:
 
 1. Find the configured controller and publish its status.

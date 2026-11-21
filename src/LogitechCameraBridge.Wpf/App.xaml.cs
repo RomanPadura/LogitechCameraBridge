@@ -19,7 +19,12 @@ public partial class App : System.Windows.Application
     [STAThread]
     private static void Main(string[] args)
     {
-        VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+        VelopackApp.Build().SetAutoApplyOnStartup(false)
+            .OnBeforeUninstallFastCallback(_ =>
+            {
+                try { new WindowsStartup().SetEnabled(false); }
+                catch (Exception ex) { Trace.TraceError(ex.ToString()); }
+            }).Run();
         var app = new App();
         app.InitializeComponent();
         app.Run();

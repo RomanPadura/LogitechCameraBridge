@@ -16,9 +16,74 @@ namespace LogitechCameraBridge.Wpf.Tests;
 public class TrayIconTests
 {
     [Fact]
+    public Task StartupTogglePersistsAndReflectsExternalChanges() => MainViewModelTests.OnDispatcherAsync(() =>
+    {
+        var startup = new FakeWindowsStartup();
+        using var tray = new TrayIcon(new AboutViewModel(), new FakeNotificationIcon(), startup);
+        var item = (MenuItem)tray.Menu.Items[4];
+        Assert.Equal(Visibility.Visible, item.Visibility);
+        Assert.False(item.IsCheckable);
+        var activate = (MenuItem)item.Items[0];
+        var deactivate = (MenuItem)item.Items[1];
+        Assert.Equal("Activate", Text(activate));
+        Assert.Equal("Deactivate", Text(deactivate));
+        Assert.True(activate.IsEnabled);
+        Assert.False(deactivate.IsEnabled);
+        activate.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Assert.True(startup.IsEnabled);
+        Assert.Equal("Starts with OS: true", Text(item));
+        Assert.False(activate.IsEnabled);
+        Assert.True(deactivate.IsEnabled);
+        deactivate.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Assert.False(startup.IsEnabled);
+        startup.IsEnabled = true;
+        tray.Menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+        Assert.False(activate.IsEnabled);
+        startup.IsEnabled = false; // A change made outside this menu.
+        tray.Menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+        Assert.True(activate.IsEnabled);
+        Assert.False(deactivate.IsEnabled);
+        Assert.Equal("Starts with OS: false", Text(item));
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public Task FailedStartupWriteRestoresCheckboxWithoutDisablingBridgeActions() => MainViewModelTests.OnDispatcherAsync(() =>
+    {
+        var startup = new FakeWindowsStartup { FailWrite = true };
+        var native = new FakeNotificationIcon();
+        using var tray = new TrayIcon(new AboutViewModel(), native, startup);
+        var item = (MenuItem)tray.Menu.Items[4];
+        ((MenuItem)item.Items[0]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Assert.True(((MenuItem)item.Items[0]).IsEnabled);
+        Assert.False(((MenuItem)item.Items[1]).IsEnabled);
+        Assert.Equal("Starts with OS: false", Text(item));
+        Assert.True(native.LastMessage.Item3);
+        Assert.True(((MenuItem)tray.Menu.Items[6]).IsEnabled);
+        return Task.CompletedTask;
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task UninstalledBuildHidesStartupEvenWithExistingEntry(bool registered) => MainViewModelTests.OnDispatcherAsync(() =>
+    {
+        var startup = new FakeWindowsStartup { CanEnable = false, IsEnabled = registered };
+        using var tray = new TrayIcon(new AboutViewModel(), new FakeNotificationIcon(), startup);
+        var item = (MenuItem)tray.Menu.Items[4];
+        Assert.Equal(Visibility.Collapsed, item.Visibility);
+        tray.Menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+        Assert.Equal(Visibility.Collapsed, item.Visibility);
+        Assert.DoesNotContain(tray.Menu.Items.Cast<MenuItem>().Where(menu => menu.Visibility == Visibility.Visible),
+            menu => Text(menu).StartsWith("Starts with OS"));
+        Assert.Equal(registered, startup.IsEnabled);
+        return Task.CompletedTask;
+    });
+
+    [Fact]
     public Task AboutSubmenuFitsLongVersionTextAtDifferentFontSizes() => MainViewModelTests.OnDispatcherAsync(async () =>
     {
-        using var tray = new TrayIcon(new AboutViewModel(), new FakeNotificationIcon());
+        using var tray = new TrayIcon(new AboutViewModel(), new FakeNotificationIcon(), new FakeWindowsStartup());
         foreach (double fontSize in new[] { 12d, 18d, 24d })
         {
             tray.Menu.FontSize = fontSize;
@@ -56,8 +121,8 @@ public class TrayIconTests
     public Task WpfMenuPreservesActionsNotificationsAndCleansUpIcons() => MainViewModelTests.OnDispatcherAsync(() =>
     {
         var native = new FakeNotificationIcon();
-        var tray = new TrayIcon(new AboutViewModel(), native);
-        Assert.Equal(new[] { "Status", "Camera controls", "Cameras", "About", "Restart", "Exit" },
+        var tray = new TrayIcon(new AboutViewModel(), native, new FakeWindowsStartup());
+        Assert.Equal(new[] { "Status", "Camera controls", "Cameras", "About", "Starts with OS: false", "Restart", "Exit" },
             tray.Menu.Items.Cast<MenuItem>().Select(Text));
         var about = (MenuItem)tray.Menu.Items[3];
         var version = (MenuItem)about.Items[0];
@@ -69,8 +134,8 @@ public class TrayIconTests
         tray.ExitRequested += (_, _) => exits++;
         var update = (MenuItem)about.Items[1];
         update.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
-        ((MenuItem)tray.Menu.Items[4]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         ((MenuItem)tray.Menu.Items[5]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        ((MenuItem)tray.Menu.Items[6]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         Assert.Equal((1, 1, 1), (updates, restarts, exits));
         tray.SetUpdating(true);
         Assert.False(update.IsEnabled);
@@ -100,7 +165,7 @@ public class TrayIconTests
         var store = new SelectionStore();
         var model = new CameraMenuViewModel(new Discovery(camera), store, new SilentLogger());
         var native = new FakeNotificationIcon();
-        using var tray = new TrayIcon(new AboutViewModel(), native);
+        using var tray = new TrayIcon(new AboutViewModel(), native, new FakeWindowsStartup());
         tray.ConfigureCameras(model);
         await model.RefreshCommand.ExecuteAsync(null);
         var cameras = (MenuItem)tray.Menu.Items[2];
@@ -116,6 +181,18 @@ public class TrayIconTests
     });
 
     private static string Text(MenuItem item) => ((TextBlock)item.Header).Text;
+
+    private sealed class FakeWindowsStartup : IWindowsStartup
+    {
+        public bool IsEnabled { get; set; }
+        public bool CanEnable { get; set; } = true;
+        public bool FailWrite { get; init; }
+        public void SetEnabled(bool enabled)
+        {
+            if (FailWrite) throw new UnauthorizedAccessException();
+            IsEnabled = enabled;
+        }
+    }
 
     private sealed class FakeNotificationIcon : INotificationAreaIcon
     {

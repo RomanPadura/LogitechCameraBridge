@@ -23,6 +23,12 @@ public sealed class TrayIcon : IDisposable
     private readonly MenuItem _controlsItem = Item("Camera controls");
     private readonly MenuItem _aboutItem = Item("About");
     private readonly MenuItem _updateItem = Item("Check for updates...");
+    private readonly MenuItem _startupItem = Item("Starts with OS: false");
+    private readonly MenuItem _activateStartupItem = Item("Activate");
+    private readonly MenuItem _deactivateStartupItem = Item("Deactivate");
+    private readonly IWindowsStartup _startup;
+    private bool _startupEnabled;
+    private bool _isShuttingDown;
     private readonly TextBlock _zoomValue = new() { Text = "Zoom: Not checked" };
     private readonly TextBlock _panValue = new() { Text = "Pan: Not checked" };
     private readonly TextBlock _tiltValue = new() { Text = "Tilt: Not checked" };
@@ -40,9 +46,10 @@ public sealed class TrayIcon : IDisposable
 
     public TrayIcon(AboutViewModel about) : this(about, new NotificationAreaIcon()) { }
 
-    internal TrayIcon(AboutViewModel about, INotificationAreaIcon notificationIcon)
+    internal TrayIcon(AboutViewModel about, INotificationAreaIcon notificationIcon, IWindowsStartup? startup = null)
     {
         _notificationIcon = notificationIcon;
+        _startup = startup ?? new WindowsStartup();
         try
         {
             int size = Math.Max(16, GetSystemMetrics(49)); // SM_CXSMICON, in physical pixels.
@@ -51,6 +58,10 @@ public sealed class TrayIcon : IDisposable
             _exitItem.Click += OnExitClick;
             _restartItem.Click += OnRestartClick;
             _updateItem.Click += OnUpdateClick;
+            _startupItem.Items.Add(_activateStartupItem);
+            _startupItem.Items.Add(_deactivateStartupItem);
+            _activateStartupItem.Click += OnActivateStartupClick;
+            _deactivateStartupItem.Click += OnDeactivateStartupClick;
             foreach (var label in new[] { _controllerStatus, _cameraStatus, _activeStatus })
                 _statusItem.Items.Add(Label(label));
             foreach (var label in new[] { _zoomValue, _panValue, _tiltValue })
@@ -58,11 +69,13 @@ public sealed class TrayIcon : IDisposable
             _camerasItem.Items.Add(Item("Cameras unavailable", enabled: false));
             _aboutItem.Items.Add(Label(new TextBlock { Text = $"Version: {about.Version}" }));
             _aboutItem.Items.Add(_updateItem);
-            foreach (var item in new[] { _statusItem, _controlsItem, _camerasItem, _aboutItem, _restartItem, _exitItem })
+            foreach (var item in new[] { _statusItem, _controlsItem, _camerasItem, _aboutItem, _startupItem, _restartItem, _exitItem })
                 _menu.Items.Add(item);
+            _menu.Opened += OnMenuOpened;
             _menu.Closed += OnMenuClosed;
             _notificationIcon.MenuRequested += OnMenuRequested;
             SetIconState(_iconState);
+            RefreshStartup();
         }
         catch
         {
@@ -88,7 +101,7 @@ public sealed class TrayIcon : IDisposable
 
     private void OnMenuRequested(Point? position)
     {
-        if (_isDisposed)
+        if (_isDisposed || _isShuttingDown)
             return;
         _notificationIcon.Activate();
         _menu.Placement = position.HasValue ? PlacementMode.AbsolutePoint : PlacementMode.MousePoint;
@@ -99,6 +112,58 @@ public sealed class TrayIcon : IDisposable
     }
 
     private void OnMenuClosed(object? sender, RoutedEventArgs e) => _notificationIcon.ReturnFocus();
+
+    private void OnMenuOpened(object? sender, RoutedEventArgs e) => RefreshStartup();
+
+    private void RefreshStartup()
+    {
+        if (_isDisposed || _isShuttingDown)
+            return;
+        _startupItem.Visibility = Visibility.Collapsed;
+        try
+        {
+            if (!_startup.CanEnable)
+                return;
+            _startupItem.Visibility = Visibility.Visible;
+            _startupEnabled = _startup.IsEnabled;
+            _startupItem.IsEnabled = true;
+            _startupItem.ToolTip = "Start when you sign in to Windows.";
+            RenderStartup();
+        }
+        catch (Exception)
+        {
+            _startupItem.IsEnabled = false;
+            ((TextBlock)_startupItem.Header).Text = "Starts with OS: unavailable";
+            _startupItem.ToolTip = "Could not read Windows startup settings. Reopen the menu to retry.";
+        }
+    }
+
+    private void RenderStartup()
+    {
+        _activateStartupItem.IsEnabled = !_startupEnabled;
+        _deactivateStartupItem.IsEnabled = _startupEnabled;
+        ((TextBlock)_startupItem.Header).Text = $"Starts with OS: {_startupEnabled.ToString().ToLowerInvariant()}";
+    }
+
+    private void OnActivateStartupClick(object sender, RoutedEventArgs e) => SetStartupEnabled(true);
+
+    private void OnDeactivateStartupClick(object sender, RoutedEventArgs e) => SetStartupEnabled(false);
+
+    private void SetStartupEnabled(bool enabled)
+    {
+        if (_isDisposed || _isShuttingDown)
+            return;
+        try
+        {
+            _startup.SetEnabled(enabled);
+            RefreshStartup();
+        }
+        catch (Exception)
+        {
+            RenderStartup(); // Preserve the previous action states if Windows rejects the write.
+            _notificationIcon.ShowMessage("Windows startup", "Could not change Windows startup settings. Please try again.", error: true);
+        }
+    }
 
     public void ConfigureStatus(StatusViewModel status)
     {
@@ -168,6 +233,7 @@ public sealed class TrayIcon : IDisposable
 
     public void DisableExit()
     {
+        _isShuttingDown = true;
         foreach (MenuItem item in _menu.Items)
             item.IsEnabled = false;
         _menu.IsOpen = false;
@@ -252,6 +318,7 @@ public sealed class TrayIcon : IDisposable
         if (_isDisposed)
             return;
         _isDisposed = true;
+        _menu.Opened -= OnMenuOpened;
         _menu.Closed -= OnMenuClosed;
         _menu.IsOpen = false;
         _notificationIcon.MenuRequested -= OnMenuRequested;
@@ -263,6 +330,8 @@ public sealed class TrayIcon : IDisposable
         _exitItem.Click -= OnExitClick;
         _restartItem.Click -= OnRestartClick;
         _updateItem.Click -= OnUpdateClick;
+        _activateStartupItem.Click -= OnActivateStartupClick;
+        _deactivateStartupItem.Click -= OnDeactivateStartupClick;
         _menu.Items.Clear();
         foreach (var icon in _icons.Values)
             icon.Dispose();
