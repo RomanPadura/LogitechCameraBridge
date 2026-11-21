@@ -68,6 +68,13 @@ all menus use WPF controls. There is no WinForms dependency. The icon is restore
 automatically after Windows Explorer restarts, and removed when the app exits.
 Both left-click and right-click on the tray icon open the same menu; keyboard activation also works.
 
+Only one bridge instance can run per Windows user/session, shared by the tray and
+console apps and across install/build folders. A second tray launch exits quietly
+before creating a tray icon or opening devices; a second console launch prints an
+already-running message. Exit the running app before switching hosts.
+Restart and updates can start a replacement after the previous process exits.
+Windows releases ownership if the process crashes, so there is no stale lock file to remove.
+
 **Starts with OS: true/false** is a submenu with **Activate** and **Deactivate**
 actions (off by default). The action matching the current state is disabled. It registers the
 app for the current Windows user at sign-in, without administrator rights, using
@@ -171,7 +178,8 @@ logs no text. Z/P and ordinary keys pass through; action keys, repeats and relea
 Ctrl/Alt/Windows modifiers, both prefixes held, or injected input do not generate commands.
 One press submits a configured press report followed by release, without keyboard auto-repeat.
 Keys never start/restart/switch the bridge.
-Use a preview window to observe actual movement. Do not run console and WPF bridges simultaneously.
+Use a preview window to observe actual movement. Exit the WPF bridge before starting
+the console (or vice versa); the single-instance guard prevents running both simultaneously.
 
 Restart and Exit remove the hook, cancel startup/processing, await HID/COM cleanup and pending
 settings writes, and flush logs. Restart launches a replacement instance that waits for the old

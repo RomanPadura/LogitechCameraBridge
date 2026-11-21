@@ -8,6 +8,7 @@ using LogitechCameraBridge.Wpf.ViewModels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Velopack;
+using LogitechCameraBridge.Common;
 
 namespace LogitechCameraBridge.Wpf;
 
@@ -17,7 +18,7 @@ public partial class App : System.Windows.Application
     private bool _isUpdating;
 
     [STAThread]
-    private static void Main(string[] args)
+    private static int Main(string[] args)
     {
         VelopackApp.Build().SetAutoApplyOnStartup(false)
             .OnBeforeUninstallFastCallback(_ =>
@@ -25,9 +26,22 @@ public partial class App : System.Windows.Application
                 try { new WindowsStartup().SetEnabled(false); }
                 catch (Exception ex) { Trace.TraceError(ex.ToString()); }
             }).Run();
-        var app = new App();
-        app.InitializeComponent();
-        app.Run();
+        try
+        {
+            // Wait before acquiring the mutex: a restart child must not reject its own parent.
+            AppRestart.WaitForParentAsync(args).GetAwaiter().GetResult();
+            using var instance = SingleInstanceGuard.TryAcquire();
+            if (instance is null)
+                return 0;
+            var app = new App();
+            app.InitializeComponent();
+            return app.Run(); // Keep the mutex on this STA thread until all OnExit cleanup completes.
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceError(ex.ToString());
+            return 1;
+        }
     }
 
     private TrayIcon? _trayIcon;
@@ -43,15 +57,6 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-
-        // A replacement instance must not initialize devices before the previous process exits.
-        try { await AppRestart.WaitForParentAsync(e.Args); }
-        catch (Exception ex)
-        {
-            Trace.TraceError(ex.ToString());
-            Shutdown(1);
-            return;
-        }
 
         try { new WindowsStartup().MigrateExistingRegistration(); }
         catch (Exception ex) { Trace.TraceError(ex.ToString()); }

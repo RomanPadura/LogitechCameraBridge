@@ -9,6 +9,17 @@ using Microsoft.Extensions.DependencyInjection;
 using LogitechCameraBridge.Logger.Interfaces;
 using LogitechCameraBridge.Controllers.Interfaces;
 using LogitechCameraBridge.Cameras.Interfaces;
+using LogitechCameraBridge.Common;
+
+if (!OperatingSystem.IsWindows())
+    throw new PlatformNotSupportedException("The camera bridge requires Windows.");
+
+using var instance = SingleInstanceGuard.TryAcquire();
+if (instance is null)
+{
+    Console.WriteLine("Logitech Camera Bridge is already running. Exit the existing tray or console instance first.");
+    return;
+}
 
 var configuration = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
