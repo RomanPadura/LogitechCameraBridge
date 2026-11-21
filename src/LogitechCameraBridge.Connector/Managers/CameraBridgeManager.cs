@@ -170,9 +170,10 @@ public class CameraBridgeManager(
 
         stream.ReadTimeout = 50;
 
-        var buttons = new ControllerButtonRepeater(buttonMappings, controls.Move);
+        var buttons = new ControllerButtonRepeater(buttonMappings, controls.Move, _logger.LogInfo);
 
         _logger.LogInfo("Listening for controller buttons...");
+        _logger.LogInfo("Hold-to-repeat enabled: initial delay=400ms, interval=100ms, HID read timeout=50ms.");
         _logger.LogInfo($"Report ID: 0x{reportId:X2}");
         foreach (var (code, command) in buttonMappings)
             _logger.LogInfo($"Button 0x{code:X2}: {command.Property}, direction={command.Direction}");
@@ -181,37 +182,7 @@ public class CameraBridgeManager(
         cancellationToken.ThrowIfCancellationRequested();
         onReady();
 
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            byte[] report;
-
-            try
-            {
-                report = stream.Read();
-            }
-            catch (TimeoutException)
-            {
-                if (!cancellationToken.IsCancellationRequested)
-                    buttons.Tick(Environment.TickCount64);
-                continue;
-            }
-
-            if (cancellationToken.IsCancellationRequested)
-                break;
-
-            // Validate the HID report.
-            if (report.Length < 2 || report[0] != reportId)
-                continue;
-
-            _logger.LogInfo(
-                $"HID Report: {Convert.ToHexString(report)}");
-
-            byte buttonCode = report[1];
-
-            buttons.Handle(buttonCode, Environment.TickCount64);
-            if (!cancellationToken.IsCancellationRequested)
-                buttons.Tick(Environment.TickCount64);
-        }
+        ControllerReportLoop.Run(stream.Read, reportId, buttons, _logger, cancellationToken);
     }
 
 }

@@ -105,6 +105,14 @@ initial download/install.
 
 ## 5. Publish the next version
 
+To start automatically at Windows sign-in, choose **Starts with OS > Activate** in
+the tray menu; choose **Deactivate** to turn it off. The submenu is hidden unless
+the app is installed (including in development and portable builds). This is optional
+and defaults to off. It uses a per-user Run entry pointing
+to `Update.exe start` outside `current/`, so package updates preserve the launch path.
+The Velopack before-uninstall callback attempts to remove the Run entry.
+No startup registration is created simply by installing or launching the app.
+
 After making and committing your next changes:
 
 ```powershell
