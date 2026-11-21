@@ -1,9 +1,34 @@
 using DirectShowLib;
+using LogitechCameraBridge.Common.Options;
 
 namespace LogitechCameraBridge.Connector.Tests;
 
 public sealed class ControllerButtonRepeaterTests
 {
+    [Fact]
+    public void ConfiguredDelayAndIntervalControlRepeatDeadlinesWithoutChangingTapOrRelease()
+    {
+        var timing = new ButtonRepeatOptions();
+        timing.SetTimings("75", "250");
+        int moves = 0;
+        var buttons = new ControllerButtonRepeater(Mappings, (_, _) => { moves++; return true; }, timing: timing);
+        buttons.Handle(0x10, 1000);
+        buttons.Handle(0x00, 1015);
+        Assert.Equal(1, moves);
+        buttons.Tick(1249);
+        Assert.Equal(1, moves);
+        buttons.Tick(1250);
+        Assert.Equal(2, moves);
+        buttons.Tick(1324);
+        Assert.Equal(2, moves);
+        buttons.Tick(1325);
+        Assert.Equal(3, moves);
+        buttons.Handle(0xFF, 1400);
+        buttons.Tick(1400);
+        buttons.Tick(2000);
+        Assert.Equal(3, moves);
+    }
+
     private static readonly Dictionary<int, (CameraControlProperty Property, int Direction)> Mappings = new()
     {
         [0x10] = (CameraControlProperty.Zoom, 1),

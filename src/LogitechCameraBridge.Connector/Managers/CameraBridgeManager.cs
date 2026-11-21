@@ -17,9 +17,11 @@ public class CameraBridgeManager(
     IOptions<CameraToControlOptions> cameraOptions,
     IControllerDiscovery controllerDiscovery,
     ICameraDiscovery cameraDiscovery,
-    ICameraBridgeLogger logger) : ICameraBridgeManager
+    ICameraBridgeLogger logger,
+    IOptions<ButtonRepeatOptions>? repeatOptions = null) : ICameraBridgeManager
 {
     private readonly ICameraBridgeLogger _logger = logger;
+    private readonly ButtonRepeatOptions _repeat = repeatOptions?.Value ?? new();
 
     private readonly IControllerDiscovery _controllerDiscovery = controllerDiscovery;
     private readonly ICameraDiscovery _cameraDiscovery = cameraDiscovery;
@@ -168,12 +170,12 @@ public class CameraBridgeManager(
         // Open the controller HID stream.
         using var stream = speakerphone.Open();
 
-        stream.ReadTimeout = 50;
+        stream.ReadTimeout = Math.Min(50, Math.Min(_repeat.RepeatIntervalMs, _repeat.InitialDelayMs));
 
-        var buttons = new ControllerButtonRepeater(buttonMappings, controls.Move, _logger.LogInfo);
+        var buttons = new ControllerButtonRepeater(buttonMappings, controls.Move, _logger.LogInfo, _repeat);
 
         _logger.LogInfo("Listening for controller buttons...");
-        _logger.LogInfo("Hold-to-repeat enabled: initial delay=400ms, interval=100ms, HID read timeout=50ms.");
+        _logger.LogInfo($"Hold-to-repeat enabled: initial delay={_repeat.InitialDelayMs}ms, interval={_repeat.RepeatIntervalMs}ms, HID read timeout={stream.ReadTimeout}ms.");
         _logger.LogInfo("GROUP release mapping: 0x00=neutral, 0xFF=release.");
         _logger.LogInfo($"Report ID: 0x{reportId:X2}");
         foreach (var (code, command) in buttonMappings)

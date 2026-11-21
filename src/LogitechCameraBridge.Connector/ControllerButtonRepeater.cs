@@ -1,4 +1,5 @@
 using DirectShowLib;
+using LogitechCameraBridge.Common.Options;
 
 namespace LogitechCameraBridge.Connector;
 
@@ -6,8 +7,10 @@ namespace LogitechCameraBridge.Connector;
 internal sealed class ControllerButtonRepeater(
     IReadOnlyDictionary<int, (CameraControlProperty Property, int Direction)> mappings,
     Func<CameraControlProperty, int, bool> move,
-    Action<string>? diagnostic = null)
+    Action<string>? diagnostic = null,
+    ButtonRepeatOptions? timing = null)
 {
+    private readonly ButtonRepeatOptions _timing = timing ?? new();
     private int? _held;
     private bool _canRepeat;
     private long _nextRepeat;
@@ -37,8 +40,8 @@ internal sealed class ControllerButtonRepeater(
         if (mappings.TryGetValue(code, out var command))
         {
             _canRepeat = move(command.Property, command.Direction);
-            _nextRepeat = now + 400;
-            diagnostic?.Invoke($"Button 0x{code:X2} pressed; repeat {(_canRepeat ? "armed, initial delay=400ms" : "stopped: camera reported no change, a limit or a control error")}.");
+            _nextRepeat = now + _timing.InitialDelayMs;
+            diagnostic?.Invoke($"Button 0x{code:X2} pressed; repeat {(_canRepeat ? $"armed, initial delay={_timing.InitialDelayMs}ms" : "stopped: camera reported no change, a limit or a control error")}.");
         }
     }
 
@@ -52,6 +55,6 @@ internal sealed class ControllerButtonRepeater(
         _canRepeat = move(command.Property, command.Direction);
         if (!_canRepeat)
             diagnostic?.Invoke($"Repeat 0x{code:X2} stopped: camera reported no change, a limit or a control error.");
-        _nextRepeat = now + 100; // No catch-up burst after a slow camera call.
+        _nextRepeat = now + _timing.RepeatIntervalMs; // No catch-up burst after a slow camera call.
     }
 }
