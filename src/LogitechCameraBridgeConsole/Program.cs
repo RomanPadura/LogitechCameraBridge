@@ -21,6 +21,9 @@ services.Configure<LoggerOptions>(
     configuration.GetRequiredSection(LoggerOptions.SectionName));
 services.Configure<BridgeControllerDeviceOptions>(
     configuration.GetRequiredSection(BridgeControllerDeviceOptions.SectionName));
+services.Configure<ButtonRepeatOptions>(options => options.SetTimings(
+    configuration[$"{ButtonRepeatOptions.SectionName}:RepeatIntervalMs"],
+    configuration[$"{ButtonRepeatOptions.SectionName}:InitialDelayMs"]));
 // USB selection is a console-only default. The tray host uses its saved camera path.
 services.Configure<CameraToControlOptions>(options =>
 {

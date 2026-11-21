@@ -20,6 +20,9 @@ public static class ServiceRegistration
     {
         services.Configure<LoggerOptions>(configuration.GetRequiredSection(LoggerOptions.SectionName));
         services.Configure<BridgeControllerDeviceOptions>(configuration.GetRequiredSection(BridgeControllerDeviceOptions.SectionName));
+        services.Configure<ButtonRepeatOptions>(options => options.SetTimings(
+            configuration[$"{ButtonRepeatOptions.SectionName}:RepeatIntervalMs"],
+            configuration[$"{ButtonRepeatOptions.SectionName}:InitialDelayMs"]));
         // Populated from the camera selected in the tray; no USB camera configuration is needed.
         services.AddOptions<CameraToControlOptions>();
         services.AddSingleton<CameraBridgeLogger>();

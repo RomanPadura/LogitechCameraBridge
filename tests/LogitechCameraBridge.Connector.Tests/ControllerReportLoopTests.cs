@@ -13,6 +13,7 @@ public class ControllerReportLoopTests
     {
         var reports = new Queue<(long Time, byte[]? Data)>();
         reports.Enqueue((0, Report(0x10)));
+        reports.Enqueue((15, Report(0x00))); // GROUP's post-press zero is not release.
         for (int time = 50; time < 1000; time += 50)
             reports.Enqueue((time, input switch
             {
@@ -20,9 +21,8 @@ public class ControllerReportLoopTests
                 "short-report" => [0x0A],
                 _ => null
             }));
+        reports.Enqueue((1000, Report(0xFF)));
         reports.Enqueue((1000, Report(0x00)));
-        reports.Enqueue((1001, Report(0xFF)));
-        reports.Enqueue((1002, Report(0x00)));
         reports.Enqueue((2000, null));
         using var stop = new CancellationTokenSource();
         long now = 0;
@@ -56,7 +56,7 @@ public class ControllerReportLoopTests
         {
             reads++;
             if (reads == 1) return Report(0x10);
-            if (reads == 2) { now = 100; return Report(0x00); }
+            if (reads == 2) { now = 100; return Report(0xFF); }
             now = 500;
             stop.Cancel();
             return Report(0x10);
@@ -76,6 +76,40 @@ public class ControllerReportLoopTests
         Assert.Throws<IOException>(() => ControllerReportLoop.Run(Read, 0x0A, buttons,
             new RecordingLogger(), default, () => reads == 1 ? 0 : 500));
         Assert.Equal(1, moves);
+    }
+
+    [Theory]
+    [InlineData(79, 1)] // Short tap: user's 80413421 -> 80413500 ms trace.
+    [InlineData(4000, 37)] // Four-second hold.
+    [InlineData(8406, 82)] // User's 80510453 -> 80518859 ms trace.
+    public void ReplayPhysicalPressZeroSilenceThenFfRelease(int releaseAt, int expectedMoves)
+    {
+        var reports = new Queue<(long Time, byte[]? Data)>();
+        reports.Enqueue((0, Report(0x10)));
+        reports.Enqueue((15, Report(0x00)));
+        for (int time = 50; time < releaseAt; time += 50)
+            reports.Enqueue((time, null));
+        reports.Enqueue((releaseAt, Report(0xFF)));
+        reports.Enqueue((releaseAt, Report(0x00)));
+        reports.Enqueue((releaseAt + 2000, null));
+        using var stop = new CancellationTokenSource();
+        long now = 0;
+        var movementTimes = new List<long>();
+        var logger = new RecordingLogger();
+        var buttons = new ControllerButtonRepeater(
+            new Dictionary<int, (CameraControlProperty, int)> { [0x10] = (CameraControlProperty.Zoom, 1) },
+            (_, _) => { movementTimes.Add(now); return true; }, logger.LogInfo);
+        byte[] Read()
+        {
+            if (!reports.TryDequeue(out var next)) { stop.Cancel(); return []; }
+            now = next.Time;
+            return next.Data ?? throw new TimeoutException();
+        }
+        ControllerReportLoop.Run(Read, 0x0A, buttons, logger, stop.Token, () => now);
+        Assert.Equal(expectedMoves, movementTimes.Count);
+        Assert.All(movementTimes, time => Assert.True(time < releaseAt));
+        Assert.Contains(logger.Messages, message => message.Contains($"released after {releaseAt}ms; repeats={expectedMoves - 1}"));
+        Assert.DoesNotContain(logger.Messages, message => message.Contains("released after 15ms"));
     }
 
     private static byte[] Report(byte code)

@@ -11,6 +11,26 @@ namespace LogitechCameraBridge.Wpf.Tests;
 public class ServiceRegistrationTests
 {
     [Theory]
+    [InlineData("{}", 100, 400)]
+    [InlineData("{\"RepeatIntervalMs\":75,\"InitialDelayMs\":250}", 75, 250)]
+    [InlineData("{\"RepeatIntervalMs\":\"wrong\",\"InitialDelayMs\":250}", 100, 250)]
+    [InlineData("{\"RepeatIntervalMs\":75,\"InitialDelayMs\":false}", 75, 400)]
+    [InlineData("{\"RepeatIntervalMs\":{},\"InitialDelayMs\":[]}", 100, 400)]
+    [InlineData("{\"RepeatIntervalMs\":null,\"InitialDelayMs\":60001}", 100, 400)]
+    public void RepeatConfigurationAcceptsNumbersAndFallsBackForWrongJsonValues(string repeatJson,
+        int expectedInterval, int expectedDelay)
+    {
+        string json = "{\"Logger\":{\"LogToConsole\":false},\"BridgeControllerDevice\":{\"Vid\":\"046D\"},\"ButtonRepeat\":" + repeatJson + "}";
+        using var stream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
+        var configuration = new ConfigurationBuilder().AddJsonStream(stream).Build();
+        using var lifetime = configuration as IDisposable;
+        using var services = new ServiceCollection().AddCameraBridge(configuration).BuildServiceProvider();
+        var options = services.GetRequiredService<IOptions<ButtonRepeatOptions>>().Value;
+        Assert.Equal(expectedInterval, options.RepeatIntervalMs);
+        Assert.Equal(expectedDelay, options.InitialDelayMs);
+    }
+
+    [Theory]
     [InlineData("true", true)]
     [InlineData("false", false)]
     [InlineData(null, false)]

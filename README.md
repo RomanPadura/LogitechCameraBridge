@@ -4,6 +4,30 @@ Windows tray and console bridge from Logitech GROUP speakerphone HID buttons to 
 with driver-exposed Zoom, Pan or Tilt controls through IAMCameraControl.
 Targets .NET 10. No video capture is started by the bridge.
 
+## Supported controller models
+
+| Controller | Model number | USB VID / PID | Verification |
+| --- | --- | --- | --- |
+| Logitech GROUP speakerphone | V-U0036 (observed P/N 886-000056) | `046D:0857` | Physical device discovery and Zoom In/Out button presses confirmed. Physical Pan/Tilt and hold-to-repeat on the current build still need verification. |
+
+The GROUP speakerphone is currently the only verified physical controller model.
+The bridge reads its camera-control HID collection: interface `MI_03`, collection
+`COL01`, Usage Page `0xFF00`, Usage `0x0001`, Report ID `0x0A`.
+Timed hardware traces show a direction report on press followed by `0x00` about
+15 ms later, even while held. `0x00` is neutral and does not stop movement.
+Physical release sends `0xFF`, followed by `0x00`; the app stops on `0xFF`.
+The app generates movement repeats itself during USB silence.
+
+Logitech identifies V-U0036 as the GROUP speakerphone in its
+[official GROUP specifications](https://hub.sync.logitech.com/group/post/group-specifications-VzQTp3uaMw10y6I).
+Other controller models and the separate GROUP infrared remote have not been
+verified with this bridge. Changing VID/PID alone does not establish compatibility;
+the HID collection and report format must also match.
+
+The controlled camera is a separate device: Logitech C930e is a tested camera,
+not an additional controller model. See [Hardware verification](#hardware-verification)
+for camera test results.
+
 ## Run
 
 ```powershell
@@ -183,10 +207,11 @@ The app queries Min, Max, Step, Default, Current, and manual-control capabilitie
 Values are limited to the reported ranges. Commands at a limit do not call `Set` again.
 Unavailable Pan/Tilt axes are logged and skipped, so Zoom can continue working.
 Driver errors are logged. The console continues processing; the WPF host stops and requires Restart.
-Hold a physical Zoom/Pan/Tilt button to keep moving: one immediate driver step, a 400 ms
-initial delay, then one step every 100 ms. Release (`0x00`) stops the movement. Duplicate
+Hold a physical Zoom/Pan/Tilt button to keep moving: one immediate driver step, then
+repetition using the JSON timings below (defaults: 400 ms initial delay, 100 ms interval).
+Release (`0xFF`) stops the movement. Duplicate
 press reports do not accelerate it. Movement also stops at a limit or on a driver failure;
-press again after release to try again. Unmapped codes cancel the current hold; `0xFF` is ignored.
+press again after release to try again. Unmapped codes cancel the current hold; `0x00` is ignored.
 Disconnecting the controller or shutting down the bridge stops the worker and its repeats.
 
 Far End (`0x40`) and presets do not move the camera. Far End reset is deferred.
@@ -195,8 +220,27 @@ To verify on the physical controller: hold Zoom In for one second, release and c
 stops; repeat for Zoom Out and the directional buttons.
 Keyboard simulation remains one step per chord; it does not emulate physical holding.
 
-For hold diagnostics, rebuild and launch the console from this checkout. Confirm it prints
+Configure both timings in the root-level `ButtonRepeat` section of `appSettings.json`
+(shared by the Console and WPF hosts):
+
+```json
+"ButtonRepeat": {
+  "RepeatIntervalMs": 100,
+  "InitialDelayMs": 400
+}
+```
+
+`RepeatIntervalMs` is the interval between repeated movements; `InitialDelayMs` is the
+delay from the first press to the first repeat. Each accepts whole milliseconds from
+1 to 60,000. A missing, null, nonnumeric, fractional, zero, negative or out-of-range
+value independently falls back to 100 ms for the interval or 400 ms for the delay.
+The JSON document itself must still have valid syntax. Restart the app after editing.
+These timings apply to all three axes and do not change the driver step size.
+Camera-call duration and HID polling can make the actual repeat rate slower.
+
+For hold diagnostics, rebuild and launch the console from this checkout. With default timings it prints
 `Hold-to-repeat enabled: initial delay=400ms, interval=100ms, HID read timeout=50ms.`
+The corrected build also prints `GROUP release mapping: 0x00=neutral, 0xFF=release.`
 Logs include monotonic HID receive times, repeat attempts and the elapsed time from press
 to release. Silence and unrelated HID report IDs both allow repeat ticks to run.
 Older console builds listing only `Zoom In` / `Zoom Out` without Pan/Tilt initialization

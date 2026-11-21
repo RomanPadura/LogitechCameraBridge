@@ -1,27 +1,57 @@
 using DirectShowLib;
+using LogitechCameraBridge.Common.Options;
 
 namespace LogitechCameraBridge.Connector.Tests;
 
 public sealed class ControllerButtonRepeaterTests
 {
+    [Fact]
+    public void ConfiguredDelayAndIntervalControlRepeatDeadlinesWithoutChangingTapOrRelease()
+    {
+        var timing = new ButtonRepeatOptions();
+        timing.SetTimings("75", "250");
+        int moves = 0;
+        var buttons = new ControllerButtonRepeater(Mappings, (_, _) => { moves++; return true; }, timing: timing);
+        buttons.Handle(0x10, 1000);
+        buttons.Handle(0x00, 1015);
+        Assert.Equal(1, moves);
+        buttons.Tick(1249);
+        Assert.Equal(1, moves);
+        buttons.Tick(1250);
+        Assert.Equal(2, moves);
+        buttons.Tick(1324);
+        Assert.Equal(2, moves);
+        buttons.Tick(1325);
+        Assert.Equal(3, moves);
+        buttons.Handle(0xFF, 1400);
+        buttons.Tick(1400);
+        buttons.Tick(2000);
+        Assert.Equal(3, moves);
+    }
+
     private static readonly Dictionary<int, (CameraControlProperty Property, int Direction)> Mappings = new()
     {
         [0x10] = (CameraControlProperty.Zoom, 1),
         [0x20] = (CameraControlProperty.Zoom, -1),
         [0x08] = (CameraControlProperty.Pan, -1),
-        [0x01] = (CameraControlProperty.Tilt, 1)
+        [0x04] = (CameraControlProperty.Pan, 1),
+        [0x01] = (CameraControlProperty.Tilt, 1),
+        [0x02] = (CameraControlProperty.Tilt, -1)
     };
 
     [Theory]
     [InlineData(0x10, CameraControlProperty.Zoom, 1)]
     [InlineData(0x20, CameraControlProperty.Zoom, -1)]
     [InlineData(0x08, CameraControlProperty.Pan, -1)]
+    [InlineData(0x04, CameraControlProperty.Pan, 1)]
     [InlineData(0x01, CameraControlProperty.Tilt, 1)]
+    [InlineData(0x02, CameraControlProperty.Tilt, -1)]
     public void HoldRepeatsAfterDelayAndReleaseStops(byte code, CameraControlProperty axis, int direction)
     {
         var moves = new List<(CameraControlProperty, int)>();
         var buttons = new ControllerButtonRepeater(Mappings, (p, d) => { moves.Add((p, d)); return true; });
         buttons.Handle(code, 0);
+        buttons.Handle(0x00, 15); // Neutral report while the physical button is still down.
         Assert.Equal((axis, direction), Assert.Single(moves));
         buttons.Tick(399);
         Assert.Single(moves);
@@ -30,6 +60,7 @@ public sealed class ControllerButtonRepeaterTests
         Assert.Equal(2, moves.Count);
         buttons.Tick(500);
         Assert.Equal(3, moves.Count);
+        buttons.Handle(0xFF, 600);
         buttons.Handle(0x00, 600);
         buttons.Tick(600);
         buttons.Tick(10000);
@@ -37,13 +68,13 @@ public sealed class ControllerButtonRepeaterTests
     }
 
     [Fact]
-    public void DuplicatePressDoesNotAccelerateOrPostponeRepeatAndFfIsIgnored()
+    public void DuplicatePressDoesNotAccelerateOrPostponeRepeatAndZeroIsIgnored()
     {
         int moves = 0;
         var buttons = new ControllerButtonRepeater(Mappings, (_, _) => { moves++; return true; });
         buttons.Handle(0x10, 0);
         buttons.Handle(0x10, 200);
-        buttons.Handle(0xFF, 300);
+        buttons.Handle(0x00, 300);
         buttons.Tick(400);
         Assert.Equal(2, moves);
         buttons.Tick(10000);
@@ -74,7 +105,7 @@ public sealed class ControllerButtonRepeaterTests
         buttons.Handle(0x10, 600);
         buttons.Tick(1000);
         Assert.Equal(2, moves);
-        buttons.Handle(0x00, 1100);
+        buttons.Handle(0xFF, 1100);
         buttons.Handle(0x10, 1200);
         Assert.Equal(3, moves);
     }
