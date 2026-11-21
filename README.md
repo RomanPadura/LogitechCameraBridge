@@ -4,6 +4,28 @@ Windows tray and console bridge from Logitech GROUP speakerphone HID buttons to 
 with driver-exposed Zoom, Pan or Tilt controls through IAMCameraControl.
 Targets .NET 10. No video capture is started by the bridge.
 
+## Supported controller models
+
+| Controller | Model number | USB VID / PID | Verification |
+| --- | --- | --- | --- |
+| Logitech GROUP speakerphone | V-U0036 (observed P/N 886-000056) | `046D:0857` | Physical device discovery and Zoom In/Out button presses confirmed. Physical Pan/Tilt and hold-to-repeat on the current build still need verification. |
+
+The GROUP speakerphone is currently the only verified physical controller model.
+The bridge reads its camera-control HID collection: interface `MI_03`, collection
+`COL01`, Usage Page `0xFF00`, Usage `0x0001`, Report ID `0x0A`.
+Observed input is a direction report on press, silence while held, then
+`0x00`, `0xFF`, `0x00` on release. The app generates movement repeats itself.
+
+Logitech identifies V-U0036 as the GROUP speakerphone in its
+[official GROUP specifications](https://hub.sync.logitech.com/group/post/group-specifications-VzQTp3uaMw10y6I).
+Other controller models and the separate GROUP infrared remote have not been
+verified with this bridge. Changing VID/PID alone does not establish compatibility;
+the HID collection and report format must also match.
+
+The controlled camera is a separate device: Logitech C930e is a tested camera,
+not an additional controller model. See [Hardware verification](#hardware-verification)
+for camera test results.
+
 ## Run
 
 ```powershell
