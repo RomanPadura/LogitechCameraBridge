@@ -7,6 +7,8 @@
     <Nullable>enable</Nullable>
     <StartupObject>LogitechCameraBridge.Wpf.App</StartupObject>
     <ApplicationIcon>Assets\LogitechCameraBridge.ico</ApplicationIcon>
+    <AssemblyTitle>Logitech Camera Bridge</AssemblyTitle>
+    <Product>Logitech Camera Bridge</Product>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="LogitechCameraBridge.Wpf.Tests" />

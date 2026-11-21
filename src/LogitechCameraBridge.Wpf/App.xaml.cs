@@ -53,6 +53,9 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        try { new WindowsStartup().MigrateExistingRegistration(); }
+        catch (Exception ex) { Trace.TraceError(ex.ToString()); }
+
         // No Window is created: the application lives only in the notification area.
         _trayIcon = new TrayIcon(new AboutViewModel());
         _trayIcon.ExitRequested += OnExitRequested;

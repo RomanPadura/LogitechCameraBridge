@@ -250,13 +250,21 @@ TestResults/tray-icons-preview.png without starting the application or accessing
 Starts with OS is a root submenu between About and Restart with Activate/Deactivate
 actions. Its header reports true/false; the action matching the current state is disabled. WindowsStartup
 reads/writes only HKCU Software\Microsoft\Windows\CurrentVersion\Run value LogitechCameraBridge.
-It defaults off, uses the quoted Velopack UpdateExePath with `start`, and never targets
+It defaults off, uses the quoted root `Logitech Camera Bridge.exe` execution stub, and never targets
 the replaceable current/ directory. Development and portable builds hide the submenu entirely,
 including when a stale entry exists. The menu refreshes registration on open and preserves previous action states
 on write failure without stopping the bridge. Startup Apps/Task Manager can separately override
 the Run entry; the menu reports registration only. A before-uninstall fast callback removes
 the entry, logging cleanup failures without blocking uninstall. Tests use fake registry delegates
 and do not register this development checkout for Windows startup.
+The WPF AssemblyTitle/Product are "Logitech Camera Bridge" so the root launcher has
+friendly Windows metadata. Existing Run entries exactly matching this installation's
+quoted UpdateExePath + `start` migrate to the friendly launcher on normal startup,
+after the restart-parent wait. No missing registration is created and the value name
+is retained to preserve Windows' StartupApproved override. Migration errors are traced
+without blocking app startup; the old command remains if the launcher is unavailable.
+18 startup/menu tests pass; local publish/pack confirmed the named launcher exists and
+its FileDescription/ProductName are both "Logitech Camera Bridge".
 The startup/menu test selection passes all 13 tests after the submenu/visibility changes.
 
 NotificationAreaIcon owns a hidden top-level HwndSource (not a message-only window),

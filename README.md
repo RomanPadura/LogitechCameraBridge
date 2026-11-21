@@ -72,9 +72,12 @@ Both left-click and right-click on the tray icon open the same menu; keyboard ac
 actions (off by default). The action matching the current state is disabled. It registers the
 app for the current Windows user at sign-in, without administrator rights, using
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\LogitechCameraBridge`.
-The command points to the package's stable `Update.exe start` launcher so it survives
+The command points to the package's stable root `Logitech Camera Bridge.exe` launcher so it survives
 app updates. Deactivate removes the entry; uninstall also attempts to remove it.
 The preference is read from the registry and does not change `userSettings.json`.
+Existing `Update.exe start` registrations for this installation migrate to the named
+launcher when the updated app starts. The registration's value name is retained, so
+Windows' separate disabled override is preserved. Startup remains off if it was not registered.
 
 The submenu is visible only in an installed release. It is hidden in development
 builds and portable packages, even if an older startup entry exists.

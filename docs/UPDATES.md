@@ -109,7 +109,10 @@ To start automatically at Windows sign-in, choose **Starts with OS > Activate** 
 the tray menu; choose **Deactivate** to turn it off. The submenu is hidden unless
 the app is installed (including in development and portable builds). This is optional
 and defaults to off. It uses a per-user Run entry pointing
-to `Update.exe start` outside `current/`, so package updates preserve the launch path.
+to the root `Logitech Camera Bridge.exe` launcher outside `current/`, so package updates
+preserve the launch path and Windows Startup Apps displays the app's friendly name.
+Existing `Update.exe start` entries for the same installation migrate on the next app
+launch after updating; startup is not enabled for users without an existing entry.
 The Velopack before-uninstall callback attempts to remove the Run entry.
 No startup registration is created simply by installing or launching the app.
 
