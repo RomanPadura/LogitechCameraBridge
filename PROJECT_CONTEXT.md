@@ -181,8 +181,8 @@ end-to-end acceptance of published Velopack updates, and prior physical-controll
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 72 connector/logger/stub and 91 WPF tests
-passed (163 total), including configurable timing/fallbacks, startup registration/toggling,
+Latest automated checks: build without warnings/errors; 72 connector/logger/stub and 99 WPF tests
+passed (171 total), including single-instance ownership/recovery, configurable timing/fallbacks, startup registration/toggling,
 hold/release timing, ignored Far End input, driver failures,
 atomic simulated taps, native tray lifecycle and WPF menu actions/layout.
 Prior self-contained win-x64 publish and Velopack installer/feed packaging checks also passed.
@@ -205,6 +205,17 @@ acceptance; user-confirmed hardware results are recorded separately below.
 Build/test required execution outside sandbox restrictions.
 
 ### Explicit application restart
+
+SingleInstanceGuard in Common owns a named mutex Local\LogitechCameraBridge.<user SID>,
+shared by Console/WPF and independent of install path/version. Both entry points acquire
+it before configuration, tray creation or device discovery and hold it until cleanup/process
+exit. A duplicate WPF launch returns success silently; Console prints an already-running
+message. Abandoned mutex ownership is accepted after a crash. Mutex acquisition/disposal
+stay on the entry-point thread; no async continuation owns/releases the mutex.
+WPF Main runs Velopack lifecycle handling first, synchronously waits for --restart-parent,
+then acquires the mutex before constructing App. This preserves update/uninstall hooks and
+restart handoff. OnStartup no longer performs the parent wait. Tests use unique mutex names
+and separate owner threads to verify duplicate rejection, handoff and abandonment recovery.
 
 TrayIcon exposes RestartRequested for the Restart item (directly above Exit) and after successful
 camera selection/save. Both use App's common shutdown path. An is-exiting guard ignores overlapping
@@ -250,13 +261,21 @@ TestResults/tray-icons-preview.png without starting the application or accessing
 Starts with OS is a root submenu between About and Restart with Activate/Deactivate
 actions. Its header reports true/false; the action matching the current state is disabled. WindowsStartup
 reads/writes only HKCU Software\Microsoft\Windows\CurrentVersion\Run value LogitechCameraBridge.
-It defaults off, uses the quoted Velopack UpdateExePath with `start`, and never targets
+It defaults off, uses the quoted root `Logitech Camera Bridge.exe` execution stub, and never targets
 the replaceable current/ directory. Development and portable builds hide the submenu entirely,
 including when a stale entry exists. The menu refreshes registration on open and preserves previous action states
 on write failure without stopping the bridge. Startup Apps/Task Manager can separately override
 the Run entry; the menu reports registration only. A before-uninstall fast callback removes
 the entry, logging cleanup failures without blocking uninstall. Tests use fake registry delegates
 and do not register this development checkout for Windows startup.
+The WPF AssemblyTitle/Product are "Logitech Camera Bridge" so the root launcher has
+friendly Windows metadata. Existing Run entries exactly matching this installation's
+quoted UpdateExePath + `start` migrate to the friendly launcher on normal startup,
+after the restart-parent wait. No missing registration is created and the value name
+is retained to preserve Windows' StartupApproved override. Migration errors are traced
+without blocking app startup; the old command remains if the launcher is unavailable.
+18 startup/menu tests pass; local publish/pack confirmed the named launcher exists and
+its FileDescription/ProductName are both "Logitech Camera Bridge".
 The startup/menu test selection passes all 13 tests after the submenu/visibility changes.
 
 NotificationAreaIcon owns a hidden top-level HwndSource (not a message-only window),
