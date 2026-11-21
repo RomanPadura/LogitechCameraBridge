@@ -195,6 +195,13 @@ To verify on the physical controller: hold Zoom In for one second, release and c
 stops; repeat for Zoom Out and the directional buttons.
 Keyboard simulation remains one step per chord; it does not emulate physical holding.
 
+For hold diagnostics, rebuild and launch the console from this checkout. Confirm it prints
+`Hold-to-repeat enabled: initial delay=400ms, interval=100ms, HID read timeout=50ms.`
+Logs include monotonic HID receive times, repeat attempts and the elapsed time from press
+to release. Silence and unrelated HID report IDs both allow repeat ticks to run.
+Older console builds listing only `Zoom In` / `Zoom Out` without Pan/Tilt initialization
+do not test the current hold implementation.
+
 ## Hardware verification
 
 The user confirmed all six commands (Zoom In/Out, Pan Left/Right, Tilt Up/Down) with the keyboard

@@ -101,6 +101,17 @@ repeat until a new press. HID reads time out every 50 ms so the same worker can 
 ticks; no camera timer or extra COM thread is created. Read failures/disconnect exit the loop.
 Far End has no reset action; factory/default reset is only a remembered future request.
 Keyboard simulation uses an atomic press/release pair to preserve one-step chord behavior.
+
+The user's full log1.txt (dated November 17) shows older Zoom-only initialization and button
+labels, not the current Pan/Tilt and hold-capable code. It cannot establish failure of the
+current repeat loop. The clarified observed sequence is direction press once, silence while
+held, then 0x00/0xFF/0x00 on release: retain 0x00 as release and ignore 0xFF.
+ControllerReportLoop now runs ticks after both timeouts and unrelated/malformed reports;
+previously a continuous stream of unrelated report IDs could skip ticks. This is a robustness
+fix, not a confirmed cause on the user's hardware. Tests reproduce silent holding, unrelated
+reports, release at a repeat deadline, short taps, cancellation and disconnect without hardware.
+Diagnostic output identifies repeat-enabled builds, logs monotonic HID times, hold duration,
+repeat attempts and stopping on no movement/limit/error. The multiplier is unchanged/deferred.
 No automatic zoom adjustment, reconnection, or WPF window is implemented yet.
 
 ## WPF lifecycle foundation
@@ -159,8 +170,8 @@ end-to-end acceptance of published Velopack updates, and prior physical-controll
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 49 connector/logger/stub and 84 WPF tests
-passed (133 total), including startup registration/toggling, hold/release timing, ignored Far End input, driver failures,
+Latest automated checks: build without warnings/errors; 54 connector/logger/stub and 85 WPF tests
+passed (139 total), including startup registration/toggling, hold/release timing, ignored Far End input, driver failures,
 atomic simulated taps, native tray lifecycle and WPF menu actions/layout.
 Prior self-contained win-x64 publish and Velopack installer/feed packaging checks also passed.
 Added capability checks distinguish unsupported driver responses from generic
