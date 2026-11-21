@@ -95,13 +95,20 @@ On each supported button report, read the current property, add or subtract one 
 clamp to Min/Max, and call `Set` with `CameraControlFlags.Manual` if the value changes.
 Every control HRESULT is checked. Failures are logged: console continues processing; WPF cancels the session and requires restart.
 Right/Up initially increase values; Left/Down decrease them. Physical image directions are pending verification.
-`ControllerButtonRepeater` performs a step on press, then repeats after 400 ms at 100 ms
+`ControllerButtonRepeater` performs a step on press, then by default repeats after 400 ms at 100 ms
 intervals while held. Duplicate codes are ignored until release/direction change, 0xFF stops,
 0x00 is ignored, and an unmapped code cancels holding. Limit/no movement/COM failure stops
 repeat until a new press. HID reads time out every 50 ms so the same worker can run repeat
 ticks; no camera timer or extra COM thread is created. Read failures/disconnect exit the loop.
 Far End has no reset action; factory/default reset is only a remembered future request.
 Keyboard simulation uses an atomic press/0xFF release pair to preserve one-step chord behavior.
+
+Root-level ButtonRepeat JSON configures RepeatIntervalMs (default 100) and InitialDelayMs
+(default 400) for both hosts. ButtonRepeatOptions parses raw configuration strings to avoid
+integer-binding failures: each setting independently accepts integers 1..60000, otherwise
+uses its default. Missing sections/keys also use defaults. The manager passes the effective
+options into the repeater and logs them; HID timeout is min(50, interval, initial delay) ms.
+Settings are read at startup; restart after edits. Driver step size remains unchanged.
 
 The user's full log1.txt (dated November 17) shows older Zoom-only initialization and button
 labels, not the current Pan/Tilt and hold-capable code. It cannot establish failure of the
@@ -174,8 +181,9 @@ end-to-end acceptance of published Velopack updates, and prior physical-controll
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 59 connector/logger/stub and 85 WPF tests
-passed (144 total), including startup registration/toggling, hold/release timing, ignored Far End input, driver failures,
+Latest automated checks: build without warnings/errors; 72 connector/logger/stub and 91 WPF tests
+passed (163 total), including configurable timing/fallbacks, startup registration/toggling,
+hold/release timing, ignored Far End input, driver failures,
 atomic simulated taps, native tray lifecycle and WPF menu actions/layout.
 Prior self-contained win-x64 publish and Velopack installer/feed packaging checks also passed.
 Added capability checks distinguish unsupported driver responses from generic

@@ -207,8 +207,9 @@ The app queries Min, Max, Step, Default, Current, and manual-control capabilitie
 Values are limited to the reported ranges. Commands at a limit do not call `Set` again.
 Unavailable Pan/Tilt axes are logged and skipped, so Zoom can continue working.
 Driver errors are logged. The console continues processing; the WPF host stops and requires Restart.
-Hold a physical Zoom/Pan/Tilt button to keep moving: one immediate driver step, a 400 ms
-initial delay, then one step every 100 ms. Release (`0xFF`) stops the movement. Duplicate
+Hold a physical Zoom/Pan/Tilt button to keep moving: one immediate driver step, then
+repetition using the JSON timings below (defaults: 400 ms initial delay, 100 ms interval).
+Release (`0xFF`) stops the movement. Duplicate
 press reports do not accelerate it. Movement also stops at a limit or on a driver failure;
 press again after release to try again. Unmapped codes cancel the current hold; `0x00` is ignored.
 Disconnecting the controller or shutting down the bridge stops the worker and its repeats.
@@ -219,7 +220,25 @@ To verify on the physical controller: hold Zoom In for one second, release and c
 stops; repeat for Zoom Out and the directional buttons.
 Keyboard simulation remains one step per chord; it does not emulate physical holding.
 
-For hold diagnostics, rebuild and launch the console from this checkout. Confirm it prints
+Configure both timings in the root-level `ButtonRepeat` section of `appSettings.json`
+(shared by the Console and WPF hosts):
+
+```json
+"ButtonRepeat": {
+  "RepeatIntervalMs": 100,
+  "InitialDelayMs": 400
+}
+```
+
+`RepeatIntervalMs` is the interval between repeated movements; `InitialDelayMs` is the
+delay from the first press to the first repeat. Each accepts whole milliseconds from
+1 to 60,000. A missing, null, nonnumeric, fractional, zero, negative or out-of-range
+value independently falls back to 100 ms for the interval or 400 ms for the delay.
+The JSON document itself must still have valid syntax. Restart the app after editing.
+These timings apply to all three axes and do not change the driver step size.
+Camera-call duration and HID polling can make the actual repeat rate slower.
+
+For hold diagnostics, rebuild and launch the console from this checkout. With default timings it prints
 `Hold-to-repeat enabled: initial delay=400ms, interval=100ms, HID read timeout=50ms.`
 The corrected build also prints `GROUP release mapping: 0x00=neutral, 0xFF=release.`
 Logs include monotonic HID receive times, repeat attempts and the elapsed time from press
