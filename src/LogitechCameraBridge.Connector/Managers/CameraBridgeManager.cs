@@ -174,6 +174,7 @@ public class CameraBridgeManager(
 
         _logger.LogInfo("Listening for controller buttons...");
         _logger.LogInfo("Hold-to-repeat enabled: initial delay=400ms, interval=100ms, HID read timeout=50ms.");
+        _logger.LogInfo("GROUP release mapping: 0x00=neutral, 0xFF=release.");
         _logger.LogInfo($"Report ID: 0x{reportId:X2}");
         foreach (var (code, command) in buttonMappings)
             _logger.LogInfo($"Button 0x{code:X2}: {command.Property}, direction={command.Direction}");

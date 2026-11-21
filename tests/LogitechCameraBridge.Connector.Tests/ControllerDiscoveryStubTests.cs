@@ -14,7 +14,7 @@ public class ControllerDiscoveryStubTests
         stream.ReadTimeout = 1;
         Assert.True(stub.TryTapButton(0x0A, 0x10));
         Assert.Equal(0x10, stream.Read()[1]);
-        Assert.Equal(0x00, stream.Read()[1]);
+        Assert.Equal(0xFF, stream.Read()[1]);
         for (int i = 0; i < 31; i++)
             Assert.True(stub.TryPressButton(0x0A, 0xFF));
         Assert.False(stub.TryTapButton(0x0A, 0x20));

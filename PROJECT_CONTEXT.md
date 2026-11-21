@@ -10,8 +10,9 @@
 - Far End: 0x40, not implemented. The user explicitly deferred reset: remember that a future
   Far End reset should restore camera driver factory/default values, not startup position or
   a user-saved preset. Do not implement it until requested. Presets 1/2/3 remain out of scope.
-- The user's supplied mapping identifies 0x00 as release (stops repeat); 0xFF remains ignored.
-  Physical hold/release acceptance still needs testing on the actual controller.
+- Timestamped physical traces supersede the earlier mapping: 0x00 arrives about 15 ms
+  after press while still held and is neutral. 0xFF signals release, followed by 0x00.
+  The handler now ignores 0x00 and stops on 0xFF; physical acceptance of the fix is pending.
 
 ## Current structure
 
@@ -95,17 +96,20 @@ clamp to Min/Max, and call `Set` with `CameraControlFlags.Manual` if the value c
 Every control HRESULT is checked. Failures are logged: console continues processing; WPF cancels the session and requires restart.
 Right/Up initially increase values; Left/Down decrease them. Physical image directions are pending verification.
 `ControllerButtonRepeater` performs a step on press, then repeats after 400 ms at 100 ms
-intervals while held. Duplicate codes are ignored until release/direction change, 0x00 stops,
-0xFF is ignored, and an unmapped code cancels holding. Limit/no movement/COM failure stops
+intervals while held. Duplicate codes are ignored until release/direction change, 0xFF stops,
+0x00 is ignored, and an unmapped code cancels holding. Limit/no movement/COM failure stops
 repeat until a new press. HID reads time out every 50 ms so the same worker can run repeat
 ticks; no camera timer or extra COM thread is created. Read failures/disconnect exit the loop.
 Far End has no reset action; factory/default reset is only a remembered future request.
-Keyboard simulation uses an atomic press/release pair to preserve one-step chord behavior.
+Keyboard simulation uses an atomic press/0xFF release pair to preserve one-step chord behavior.
 
 The user's full log1.txt (dated November 17) shows older Zoom-only initialization and button
 labels, not the current Pan/Tilt and hold-capable code. It cannot establish failure of the
-current repeat loop. The clarified observed sequence is direction press once, silence while
-held, then 0x00/0xFF/0x00 on release: retain 0x00 as release and ignore 0xFF.
+current repeat loop. Later timed traces of the current build established the root cause:
+the first 0x00 is emitted 15-16 ms after press while still held, and was wrongly treated as
+release. The physical release emits 0xFF/0x00. The corrected mapping is now used in both
+the repeater and keyboard stub. Regression tests replay a 79 ms tap, four-second hold and
+the measured 8406 ms interval, ensuring neutral zeros do not stop repeats and 0xFF does.
 ControllerReportLoop now runs ticks after both timeouts and unrelated/malformed reports;
 previously a continuous stream of unrelated report IDs could skip ticks. This is a robustness
 fix, not a confirmed cause on the user's hardware. Tests reproduce silent holding, unrelated
@@ -170,8 +174,8 @@ end-to-end acceptance of published Velopack updates, and prior physical-controll
 commands on a real integrated camera (details below). The earlier Computer Use inventory did not expose a targetable
 notification area, so no visual tray acceptance is claimed.
 
-Latest automated checks: build without warnings/errors; 54 connector/logger/stub and 85 WPF tests
-passed (139 total), including startup registration/toggling, hold/release timing, ignored Far End input, driver failures,
+Latest automated checks: build without warnings/errors; 59 connector/logger/stub and 85 WPF tests
+passed (144 total), including startup registration/toggling, hold/release timing, ignored Far End input, driver failures,
 atomic simulated taps, native tray lifecycle and WPF menu actions/layout.
 Prior self-contained win-x64 publish and Velopack installer/feed packaging checks also passed.
 Added capability checks distinguish unsupported driver responses from generic

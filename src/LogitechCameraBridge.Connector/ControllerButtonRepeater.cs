@@ -16,9 +16,11 @@ internal sealed class ControllerButtonRepeater(
 
     public void Handle(byte code, long now)
     {
-        if (code == 0xFF)
-            return;
+        // GROUP sends a zero report just after press even while the button is held.
+        // Physical release is 0xFF followed by another zero report.
         if (code == 0x00)
+            return;
+        if (code == 0xFF)
         {
             if (_held is { } held)
                 diagnostic?.Invoke($"Button 0x{held:X2} released after {now - _pressedAt}ms; repeats={_repeatCount}.");

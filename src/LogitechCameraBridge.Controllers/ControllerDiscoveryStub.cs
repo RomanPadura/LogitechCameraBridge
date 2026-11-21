@@ -15,7 +15,7 @@ public sealed class ControllerDiscoveryStub(ICameraBridgeLogger logger) : IContr
 
     // Enqueue both reports together: a full queue must never leave a simulated button held.
     public bool TryTapButton(byte reportId, byte buttonCode)
-        => SubmitReports(reportId, [buttonCode, 0x00]);
+        => SubmitReports(reportId, [buttonCode, 0xFF]);
 
     private bool SubmitReports(byte reportId, byte[] codes)
     {
