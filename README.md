@@ -118,8 +118,8 @@ are preserved; invalid JSON is reported without overwriting it. Failed saves ret
 
 | Row | Values |
 | --- | --- |
-| Logitech Controller | Stub, <device name>, Not found, or Error |
-| Camera | <camera name>, Not selected, or Error |
+| Logitech Controller | Stub, {device name}, Not found, or Error |
+| Camera | {camera name}, Not selected, or Error |
 | Active | true or false |
 
 Missing devices, no selection, errors and Active: false are red. Status updates from initialization
